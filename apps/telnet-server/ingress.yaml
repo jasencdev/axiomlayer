@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: telnet-metrics
+  namespace: telnet-server
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: authentik-ak-outpost-forward-auth-outpost@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+  - hosts:
+    - telnet.lab.axiomlayer.com
+    secretName: telnet-metrics-tls
+  rules:
+  - host: telnet.lab.axiomlayer.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: telnet-server-metrics
+            port:
+              number: 9000

@@ -3,4 +3,4 @@ kind: Kustomization
 resources:
   - ../../infrastructure/cert-manager
   - ../../infrastructure/authentik
-  # ArgoCD managed manually - self-management causes loops
+  - ../../apps/argocd
