@@ -1,0 +1,26 @@
+# Authentik Helm Values
+# Install with: helm install authentik authentik/authentik -n authentik -f values.yaml
+
+authentik:
+  secret_key: "" # Set via --set or secret
+  postgresql:
+    password: "" # Set via --set or secret
+
+postgresql:
+  enabled: true
+  auth:
+    password: "" # Set via --set or secret
+
+redis:
+  enabled: true
+
+server:
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - auth.lab.axiomlayer.com
+    tls:
+      - secretName: authentik-tls
+        hosts:
+          - auth.lab.axiomlayer.com

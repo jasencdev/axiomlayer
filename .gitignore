@@ -1,0 +1,12 @@
+# Secrets - never commit real secrets
+*.secret.yaml
+*-secret.yaml
+
+# Local files
+.DS_Store
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.bak
