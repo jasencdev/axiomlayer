@@ -1,0 +1,29 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: n8n-db
+  namespace: n8n
+  labels:
+    app.kubernetes.io/name: n8n-db
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  instances: 1
+
+  storage:
+    size: 5Gi
+    storageClass: longhorn
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "128MB"
+
+  bootstrap:
+    initdb:
+      database: n8n
+      owner: n8n
+
+  monitoring:
+    enablePodMonitor: true
