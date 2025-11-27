@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+# Note: Longhorn installed via Helm
+# helm install longhorn longhorn/longhorn -n longhorn-system
