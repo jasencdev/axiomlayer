@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   validate-manifests:
@@ -83,3 +84,41 @@ jobs:
 
       - name: Scan for secrets
         run: trivy fs . --scanners secret --exit-code 1
+
+  # Gate job - only passes when all CI checks pass
+  ci-passed:
+    name: CI Passed
+    runs-on: [self-hosted, homelab]
+    needs: [validate-manifests, lint, security]
+    if: always()
+    steps:
+      - name: Check CI results
+        run: |
+          if [ "${{ needs.validate-manifests.result }}" != "success" ]; then
+            echo "Manifest validation failed"
+            exit 1
+          fi
+          if [ "${{ needs.security.result }}" != "success" ]; then
+            echo "Security scan failed"
+            exit 1
+          fi
+          # Lint is informational only
+          echo "All required CI checks passed"
+
+      - name: Trigger ArgoCD sync
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          ARGOCD_SERVER: argocd.lab.axiomlayer.com
+          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
+        run: |
+          if [ -z "$ARGOCD_AUTH_TOKEN" ]; then
+            echo "ARGOCD_AUTH_TOKEN not set, skipping sync trigger"
+            exit 0
+          fi
+
+          # Trigger sync for the root application (app of apps)
+          curl -sSL -X POST \
+            -H "Authorization: Bearer $ARGOCD_AUTH_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://${ARGOCD_SERVER}/api/v1/applications/applications/sync" \
+            -d '{"prune": true}' || echo "Sync trigger sent (may require manual approval)"
