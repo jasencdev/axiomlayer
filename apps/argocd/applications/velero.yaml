@@ -15,7 +15,7 @@ spec:
         kubectl:
           image:
             repository: bitnami/kubectl
-            tag: "1.31"
+            tag: "latest"
 
         initContainers:
           - name: velero-plugin-for-aws
