@@ -8,11 +8,11 @@ spec:
   source:
     repoURL: https://helm.plane.so/
     chart: plane-ce
-    targetRevision: 1.0.22
+    targetRevision: 1.4.0
     helm:
       releaseName: plane
       values: |
-        planeVersion: v0.23.1
+        planeVersion: stable
 
         ingress:
           enabled: true
