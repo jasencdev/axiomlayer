@@ -12,7 +12,7 @@ spec:
   replicas: 1
   template:
     spec:
-      repository: jasencarroll/homelab-gitops
+      organization: jasencdev
       labels:
         - homelab
         - self-hosted
