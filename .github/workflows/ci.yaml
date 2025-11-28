@@ -13,7 +13,7 @@ jobs:
     runs-on: [self-hosted, homelab]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install kubectl
         run: |
@@ -59,7 +59,7 @@ jobs:
     runs-on: [self-hosted, homelab]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install kube-linter
         run: |
@@ -91,7 +91,7 @@ jobs:
     runs-on: [self-hosted, homelab]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Trivy
         run: |
