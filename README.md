@@ -17,13 +17,14 @@ GitOps-managed K3s homelab with ArgoCD, SSO, TLS, and observability.
 | Alertmanager | https://alerts.lab.axiomlayer.com | Alert management and routing |
 | ArgoCD | https://argocd.lab.axiomlayer.com | GitOps continuous delivery |
 | Authentik | https://auth.lab.axiomlayer.com | SSO/OIDC identity provider |
+| Campfire | https://chat.lab.axiomlayer.com | Team chat (37signals) |
 | Grafana | https://grafana.lab.axiomlayer.com | Metrics dashboards |
 | Longhorn | https://longhorn.lab.axiomlayer.com | Distributed storage UI |
 | n8n (autom8) | https://autom8.lab.axiomlayer.com | Workflow automation |
+| Open WebUI | https://ai.lab.axiomlayer.com | AI chat interface (Ollama backend) |
 | Outline | https://docs.lab.axiomlayer.com | Documentation wiki |
 | Plane | https://plane.lab.axiomlayer.com | Project management |
 | Telnet Server | https://telnet.lab.axiomlayer.com | Demo app with SSO |
-| Open WebUI | https://ai.lab.axiomlayer.com | AI chat interface (Ollama backend) |
 
 ---
 
@@ -74,11 +75,12 @@ GitOps-managed K3s homelab with ArgoCD, SSO, TLS, and observability.
 
 | Application | Purpose | Namespace |
 |-------------|---------|-----------|
+| Campfire | Team chat (37signals) | campfire |
 | n8n | Workflow automation | n8n |
+| Open WebUI | AI chat interface | open-webui |
 | Outline | Documentation wiki | outline |
 | Plane | Project management | plane |
 | Telnet Server | Demo application | telnet-server |
-| Open WebUI | AI chat interface | open-webui |
 
 ---
 
