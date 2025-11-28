@@ -1,10 +1,11 @@
-# Homelab GitOps
+# Axiomlayer
 
 GitOps-managed K3s homelab with ArgoCD, SSO, TLS, and observability.
 
 - **Domain**: `*.lab.axiomlayer.com`
 - **Cluster**: 3-node K3s over Tailscale mesh
 - **CI/CD**: Self-hosted GitHub Actions runners (`jasencdev` org)
+- **Repository**: `jasencdev/axiomlayer`
 
 ---
 
@@ -12,6 +13,7 @@ GitOps-managed K3s homelab with ArgoCD, SSO, TLS, and observability.
 
 | Service | URL | Description |
 |---------|-----|-------------|
+| Dashboard | https://db.lab.axiomlayer.com | Service portal |
 | Alertmanager | https://alerts.lab.axiomlayer.com | Alert management and routing |
 | ArgoCD | https://argocd.lab.axiomlayer.com | GitOps continuous delivery |
 | Authentik | https://auth.lab.axiomlayer.com | SSO/OIDC identity provider |
