@@ -5,6 +5,7 @@ resources:
   - pvc.yaml
   - configmap.yaml
   - sealed-secret.yaml
+  - sealed-pull-secret.yaml
   - deployment.yaml
   - service.yaml
   - certificate.yaml
