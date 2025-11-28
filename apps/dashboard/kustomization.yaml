@@ -14,6 +14,8 @@ resources:
   - networkpolicy.yaml
   - pdb.yaml
 
-commonLabels:
-  app.kubernetes.io/part-of: homelab
-  app.kubernetes.io/managed-by: argocd
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: homelab
+      app.kubernetes.io/managed-by: argocd
+    includeSelectors: false
