@@ -192,6 +192,24 @@ data:
         <div class="grid">
           <h2 class="section-title">Applications</h2>
 
+          <a href="https://ai.lab.axiomlayer.com" class="card">
+            <div class="card-header">
+              <div class="card-icon icon-green">AI</div>
+              <span class="card-title">Open WebUI</span>
+            </div>
+            <p class="card-desc">AI chat interface with Ollama</p>
+            <span class="card-url">ai.lab.axiomlayer.com</span>
+          </a>
+
+          <a href="https://chat.lab.axiomlayer.com" class="card">
+            <div class="card-header">
+              <div class="card-icon icon-red">C</div>
+              <span class="card-title">Campfire</span>
+            </div>
+            <p class="card-desc">Team chat and collaboration</p>
+            <span class="card-url">chat.lab.axiomlayer.com</span>
+          </a>
+
           <a href="https://plane.lab.axiomlayer.com" class="card">
             <div class="card-header">
               <div class="card-icon icon-blue">P</div>
