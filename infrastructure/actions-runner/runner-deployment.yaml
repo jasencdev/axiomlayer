@@ -16,6 +16,7 @@ spec:
       labels:
         - homelab
         - self-hosted
+      serviceAccountName: actions-runner
       dockerEnabled: true
       resources:
         requests:

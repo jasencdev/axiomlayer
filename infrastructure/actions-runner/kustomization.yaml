@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: actions-runner
 resources:
   - namespace.yaml
+  - rbac.yaml
   - sealed-secret.yaml
   - runner-deployment.yaml
 labels:
