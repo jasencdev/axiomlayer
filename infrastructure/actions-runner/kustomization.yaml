@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: actions-runner
 resources:
   - namespace.yaml
+  - sealed-secret.yaml
 labels:
   - pairs:
       app.kubernetes.io/managed-by: argocd
