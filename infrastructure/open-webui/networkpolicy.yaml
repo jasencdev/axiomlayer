@@ -88,3 +88,61 @@ spec:
           port: 9000
         - protocol: TCP
           port: 9443
+    # Allow PostgreSQL within namespace
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: open-webui-db
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# Allow CloudNativePG pods to receive connections
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: open-webui-db-allow
+  namespace: open-webui
+  labels:
+    app.kubernetes.io/name: open-webui
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: open-webui-db
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow open-webui app to connect
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: open-webui
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow CNPG operator
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 8000
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

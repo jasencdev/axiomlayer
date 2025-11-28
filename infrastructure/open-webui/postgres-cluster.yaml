@@ -1,0 +1,29 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: open-webui-db
+  namespace: open-webui
+  labels:
+    app.kubernetes.io/name: open-webui-db
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  instances: 1
+
+  storage:
+    size: 10Gi
+    storageClass: longhorn
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "256MB"
+
+  bootstrap:
+    initdb:
+      database: openwebui
+      owner: openwebui
+
+  monitoring:
+    enablePodMonitor: true
