@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alert-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: rules
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+data:
+  homelab-alerts.yml: |
+    groups:
+      - name: homelab-node-alerts
+        rules:
+          - alert: NodeDown
+            expr: up{job="node-exporter"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Node {{ $labels.instance }} is down"
+              description: "Node has been unreachable for more than 2 minutes."
+
+          - alert: NodeHighCPU
+            expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High CPU usage on {{ $labels.instance }}"
+              description: "CPU usage is above 80% for more than 5 minutes."
+
+          - alert: NodeHighMemory
+            expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High memory usage on {{ $labels.instance }}"
+              description: "Memory usage is above 85% for more than 5 minutes."
+
+          - alert: NodeDiskSpaceLow
+            expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes) * 100 < 15
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Low disk space on {{ $labels.instance }}"
+              description: "Disk space is below 15% on {{ $labels.mountpoint }}."
+
+          - alert: NodeDiskSpaceCritical
+            expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes) * 100 < 5
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Critical disk space on {{ $labels.instance }}"
+              description: "Disk space is below 5% on {{ $labels.mountpoint }}."
+
+      - name: homelab-kubernetes-alerts
+        rules:
+          - alert: PodCrashLooping
+            expr: rate(kube_pod_container_status_restarts_total[15m]) * 60 * 15 > 3
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping"
+              description: "Pod has restarted more than 3 times in the last 15 minutes."
+
+          - alert: PodNotReady
+            expr: kube_pod_status_ready{condition="true"} == 0
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is not ready"
+              description: "Pod has been in a non-ready state for more than 10 minutes."
+
+          - alert: DeploymentReplicasMismatch
+            expr: kube_deployment_spec_replicas != kube_deployment_status_replicas_available
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} has mismatched replicas"
+              description: "Deployment does not have the expected number of replicas."
+
+          - alert: PersistentVolumeSpaceLow
+            expr: kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes < 0.15
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "PV {{ $labels.persistentvolumeclaim }} is running low on space"
+              description: "Persistent volume has less than 15% space remaining."
+
+      - name: homelab-certificate-alerts
+        rules:
+          - alert: CertificateExpiringSoon
+            expr: certmanager_certificate_expiration_timestamp_seconds - time() < 604800
+            for: 1h
+            labels:
+              severity: warning
+            annotations:
+              summary: "Certificate {{ $labels.name }} expires in less than 7 days"
+              description: "TLS certificate will expire soon, check cert-manager."
+
+          - alert: CertificateExpiryCritical
+            expr: certmanager_certificate_expiration_timestamp_seconds - time() < 86400
+            for: 10m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Certificate {{ $labels.name }} expires in less than 24 hours"
+              description: "TLS certificate is about to expire!"
+
+      - name: homelab-longhorn-alerts
+        rules:
+          - alert: LonghornVolumeHealthy
+            expr: longhorn_volume_state{state!="attached"} == 1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Longhorn volume {{ $labels.volume }} is not attached"
+              description: "Volume is in an unhealthy state."
+
+          - alert: LonghornNodeDown
+            expr: longhorn_node_status{condition="ready"} == 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Longhorn node {{ $labels.node }} is not ready"
+              description: "Storage node is down, replication may be affected."

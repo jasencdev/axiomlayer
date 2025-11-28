@@ -11,6 +11,7 @@ GitOps-managed K3s homelab with ArgoCD, SSO, TLS, and observability.
 
 | Service | URL | Description |
 |---------|-----|-------------|
+| Alertmanager | https://alerts.lab.axiomlayer.com | Alert management and routing |
 | ArgoCD | https://argocd.lab.axiomlayer.com | GitOps continuous delivery |
 | Authentik | https://auth.lab.axiomlayer.com | SSO/OIDC identity provider |
 | Grafana | https://grafana.lab.axiomlayer.com | Metrics dashboards |
@@ -555,9 +556,9 @@ kubectl apply -k apps/argocd/applications
 - [x] Workflow automation (n8n)
 - [x] Documentation wiki (Outline)
 - [x] Project management (Plane)
-- [ ] CI/CD pipelines (Tekton or GitHub Actions runners)
+- [x] Alerting (Alertmanager)
+- [ ] CI/CD pipelines (GitHub Actions self-hosted runners)
 - [ ] Backup automation (Longhorn → NAS)
-- [ ] Alerting (Alertmanager)
 
 ---
 

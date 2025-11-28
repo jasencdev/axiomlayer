@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: actions-runner-set
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: oci://ghcr.io/actions/actions-runner-controller-charts
+    chart: gha-runner-scale-set
+    targetRevision: 0.9.3
+    helm:
+      releaseName: homelab-runners
+      values: |
+        githubConfigUrl: "https://github.com/jasencarroll"
+        githubConfigSecret: github-runner-token
+
+        minRunners: 1
+        maxRunners: 5
+
+        containerMode:
+          type: dind
+
+        template:
+          spec:
+            containers:
+              - name: runner
+                image: ghcr.io/actions/actions-runner:latest
+                command: ["/home/runner/run.sh"]
+                resources:
+                  requests:
+                    cpu: 500m
+                    memory: 512Mi
+                  limits:
+                    cpu: 2000m
+                    memory: 2Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: actions-runner
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
