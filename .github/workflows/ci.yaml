@@ -18,7 +18,13 @@ jobs:
       - name: Install kubectl
         run: |
           if ! command -v kubectl &> /dev/null; then
-            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            ARCH=$(uname -m)
+            case $ARCH in
+              x86_64) ARCH="amd64" ;;
+              aarch64) ARCH="arm64" ;;
+              armv7l) ARCH="arm" ;;
+            esac
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl"
             chmod +x kubectl
             sudo mv kubectl /usr/local/bin/
           fi
@@ -58,7 +64,14 @@ jobs:
       - name: Install kube-linter
         run: |
           if ! command -v kube-linter &> /dev/null; then
-            curl -sSL https://github.com/stackrox/kube-linter/releases/download/v0.6.8/kube-linter-linux.tar.gz | tar xz
+            ARCH=$(uname -m)
+            case $ARCH in
+              x86_64) BINARY="kube-linter-linux" ;;
+              aarch64) BINARY="kube-linter-linux-arm64" ;;
+              armv7l) BINARY="kube-linter-linux-arm" ;;
+              *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+            esac
+            curl -sSL "https://github.com/stackrox/kube-linter/releases/download/v0.6.8/${BINARY}.tar.gz" | tar xz
             sudo mv kube-linter /usr/local/bin/
           fi
           kube-linter version
@@ -83,6 +96,7 @@ jobs:
       - name: Install Trivy
         run: |
           if ! command -v trivy &> /dev/null; then
+            # Trivy install script auto-detects architecture
             curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin v0.58.0
           fi
           trivy version
