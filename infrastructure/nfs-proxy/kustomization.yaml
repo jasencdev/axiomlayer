@@ -6,6 +6,7 @@ resources:
   - configmap.yaml
   - deployment.yaml
   - service.yaml
+  - networkpolicy.yaml
 labels:
   - pairs:
       app.kubernetes.io/managed-by: argocd

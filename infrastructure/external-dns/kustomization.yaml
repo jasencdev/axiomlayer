@@ -6,3 +6,5 @@ resources:
   - rbac.yaml
   - deployment.yaml
   - sealed-secret.yaml
+  - pdb.yaml
+  - networkpolicy.yaml

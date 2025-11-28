@@ -7,11 +7,14 @@ resources:
   - authentik.yaml
   - cert-manager.yaml
   - cloudnative-pg.yaml
+  - dashboard.yaml
   - external-dns.yaml
   - longhorn.yaml
+  - loki.yaml
+  - n8n.yaml
+  - nfs-proxy.yaml
+  - open-webui.yaml
+  - outline.yaml
   - plane.yaml
   - plane-extras.yaml
   - telnet-server.yaml
-  - loki.yaml
-  - nfs-proxy.yaml
-  - open-webui.yaml

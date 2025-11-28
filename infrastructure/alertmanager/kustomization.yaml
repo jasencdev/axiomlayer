@@ -9,6 +9,8 @@ resources:
   - certificate.yaml
   - ingress.yaml
   - prometheus-rules.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
 labels:
   - pairs:
       app.kubernetes.io/managed-by: argocd

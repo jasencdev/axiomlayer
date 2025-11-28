@@ -11,6 +11,7 @@ resources:
   - certificate.yaml
   - ingress.yaml
   - networkpolicy.yaml
+  - pdb.yaml
 labels:
   - pairs:
       app.kubernetes.io/managed-by: argocd

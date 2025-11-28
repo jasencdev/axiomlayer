@@ -12,6 +12,7 @@ resources:
   - certificate.yaml
   - ingress.yaml
   - networkpolicy.yaml
+  - pdb.yaml
 
 commonLabels:
   app.kubernetes.io/part-of: homelab
