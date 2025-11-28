@@ -5,6 +5,7 @@ resources:
   - actions-runner-infra.yaml
   - alertmanager.yaml
   - authentik.yaml
+  - campfire.yaml
   - cert-manager.yaml
   - cloudnative-pg.yaml
   - dashboard.yaml

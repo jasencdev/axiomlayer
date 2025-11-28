@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: campfire-config
+  namespace: campfire
+  labels:
+    app.kubernetes.io/name: campfire
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+data:
+  # Disable built-in SSL - Traefik handles TLS termination
+  DISABLE_SSL: "true"
+  # Rails environment
+  RAILS_ENV: "production"
+  RAILS_LOG_TO_STDOUT: "true"
