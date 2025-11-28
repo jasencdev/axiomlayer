@@ -1,0 +1,30 @@
+name: Test Self-Hosted Runner
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: [self-hosted, homelab]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test runner
+        run: |
+          echo "Hello from self-hosted runner!"
+          echo "Hostname: $(hostname)"
+          echo "Date: $(date)"
+          kubectl version --client || echo "kubectl not installed"
+
+      - name: Validate manifests
+        run: |
+          echo "Validating kustomize manifests..."
+          for dir in apps/*/; do
+            if [ -f "$dir/kustomization.yaml" ]; then
+              echo "Checking $dir"
+              kubectl kustomize "$dir" > /dev/null && echo "  ✓ Valid" || echo "  ✗ Invalid"
+            fi
+          done
