@@ -69,3 +69,10 @@ spec:
                 name: campfire
                 port:
                   number: 80
+          - path: /cable
+            pathType: Prefix
+            backend:
+              service:
+                name: campfire
+                port:
+                  number: 80
