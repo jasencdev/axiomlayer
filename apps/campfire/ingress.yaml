@@ -29,3 +29,43 @@ spec:
                 name: campfire
                 port:
                   number: 80
+---
+# Separate ingress for static assets that don't need auth
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: campfire-static
+  namespace: campfire
+  labels:
+    app.kubernetes.io/name: campfire
+    app.kubernetes.io/component: chat
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.priority: "100"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - chat.lab.axiomlayer.com
+      secretName: campfire-tls
+  rules:
+    - host: chat.lab.axiomlayer.com
+      http:
+        paths:
+          - path: /webmanifest.json
+            pathType: Exact
+            backend:
+              service:
+                name: campfire
+                port:
+                  number: 80
+          - path: /service-worker.js
+            pathType: Exact
+            backend:
+              service:
+                name: campfire
+                port:
+                  number: 80
