@@ -38,7 +38,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: telnet-server
-        image: ghcr.io/jasencarroll/telnet-server:v2
+        image: ghcr.io/jasencarroll/telnet-server@sha256:e08fde2a9b0db0aa0a36e824bc1bc15dc7fe5cec9fcbead5243b7124d09cb041
         imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false

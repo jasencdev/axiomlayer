@@ -29,7 +29,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: n8n
-        image: n8nio/n8n:1.122.3
+        image: n8nio/n8n@sha256:42f2a4ea1ea8473934c085caeb6a4cf4599d9a13eb1e3ea2549cb71c034bd102
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false

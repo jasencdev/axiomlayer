@@ -25,7 +25,7 @@ spec:
         kubernetes.io/hostname: neko
       containers:
         - name: nfs-server
-          image: erichough/nfs-server:2.2.1
+          image: erichough/nfs-server@sha256:1efd4ece380c5ba27479417585224ef857006daa46ab84560a28c1224bc71e9e
           ports:
             - name: nfs
               containerPort: 2049

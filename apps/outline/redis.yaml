@@ -29,7 +29,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: redis
-        image: redis:7.4-alpine
+        image: redis@sha256:ee64a64eaab618d88051c3ade8f6352d11531fcf79d9a4818b9b183d8c1d18ba
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false

@@ -29,7 +29,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: outline
-        image: outlinewiki/outline:0.81.1
+        image: outlinewiki/outline@sha256:e539971b59b2523ab54bf792105d1cff6432974a37e18211c175cd053d7feb62
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false

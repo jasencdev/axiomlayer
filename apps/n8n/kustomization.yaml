@@ -9,3 +9,4 @@ resources:
   - service.yaml
   - certificate.yaml
   - ingress.yaml
+  - networkpolicy.yaml
