@@ -10,6 +10,7 @@ resources:
   - cloudnative-pg.yaml
   - dashboard.yaml
   - external-dns.yaml
+  - kube-prometheus-stack.yaml
   - longhorn.yaml
   - loki.yaml
   - n8n.yaml

@@ -1,0 +1,56 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 79.8.2
+    helm:
+      values: |
+        grafana:
+          additionalDataSources:
+            - name: Loki
+              type: loki
+              access: proxy
+              url: http://loki:3100
+          envFromSecret: grafana-oidc-secret
+          grafana.ini:
+            server:
+              root_url: https://grafana.lab.axiomlayer.com
+            auth:
+              disable_login_form: false
+              oauth_auto_login: false
+            auth.generic_oauth:
+              enabled: true
+              name: Authentik
+              allow_sign_up: true
+              use_pkce: true
+              scopes: openid email profile
+              auth_url: https://auth.lab.axiomlayer.com/application/o/authorize/
+              token_url: https://auth.lab.axiomlayer.com/application/o/token/
+              api_url: https://auth.lab.axiomlayer.com/application/o/userinfo/
+              client_id: $__env{client-id}
+              client_secret: $__env{client-secret}
+              email_attribute_path: email
+              login_attribute_path: preferred_username
+              name_attribute_path: name
+              role_attribute_path: contains(groups[*], 'Homelab Admins') && 'Admin' || 'Viewer'
+            users:
+              auto_assign_org_role: Viewer
+        prometheus:
+          prometheusSpec:
+            serviceMonitorSelectorNilUsesHelmValues: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
