@@ -24,6 +24,7 @@ spec:
 
         ssl:
           createIssuer: false
+          generateTLS: true
           secretName: plane-tls
 
         postgres:
