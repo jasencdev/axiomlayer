@@ -98,7 +98,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 spec:
   source:
-    repoURL: https://github.com/jasencarroll/homelab-gitops.git
+    repoURL: https://github.com/jasencdev/axiomlayer.git
     targetRevision: main
     path: {apps|infrastructure}/{component}
   syncPolicy:

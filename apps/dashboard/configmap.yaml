@@ -287,7 +287,7 @@ data:
 
         <footer>
           <p>Powered by K3s, ArgoCD, and Authentik</p>
-          <p><a href="https://github.com/jasencarroll/homelab-gitops">View on GitHub</a></p>
+          <p><a href="https://github.com/jasencdev/axiomlayer">View on GitHub</a></p>
         </footer>
       </div>
     </body>

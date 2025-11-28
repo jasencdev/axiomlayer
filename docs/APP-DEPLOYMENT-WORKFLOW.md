@@ -227,7 +227,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/jasencarroll/homelab-gitops.git
+    repoURL: https://github.com/jasencdev/axiomlayer.git
     targetRevision: main
     path: apps/{app-name}
   destination:

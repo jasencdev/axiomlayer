@@ -1,0 +1,316 @@
+# Authentik Blueprint for Homelab Applications
+# Apply via: Authentik Admin > System > Blueprints > Import
+# Or mount as ConfigMap to /blueprints/ in Authentik pod
+version: 1
+metadata:
+  name: Homelab Applications
+  labels:
+    blueprints.goauthentik.io/description: "All homelab application definitions"
+entries:
+  # ===================
+  # User Groups
+  # ===================
+  - model: authentik_core.group
+    id: group-admins
+    identifiers:
+      name: Homelab Admins
+    attrs:
+      is_superuser: false
+
+  - model: authentik_core.group
+    id: group-users
+    identifiers:
+      name: Homelab Users
+    attrs:
+      is_superuser: false
+
+  # ===================
+  # Scope Mappings (for OIDC)
+  # ===================
+  - model: authentik_providers_oauth2.scopemapping
+    id: scope-openid
+    identifiers:
+      managed: goauthentik.io/providers/oauth2/scope-openid
+    state: absent  # Use built-in
+
+  - model: authentik_providers_oauth2.scopemapping
+    id: scope-email
+    identifiers:
+      managed: goauthentik.io/providers/oauth2/scope-email
+    state: absent  # Use built-in
+
+  - model: authentik_providers_oauth2.scopemapping
+    id: scope-profile
+    identifiers:
+      managed: goauthentik.io/providers/oauth2/scope-profile
+    state: absent  # Use built-in
+
+  # ===================
+  # Forward Auth Provider (shared for apps without native OIDC)
+  # ===================
+  - model: authentik_providers_proxy.proxyprovider
+    id: provider-forward-auth
+    identifiers:
+      name: Forward Auth Provider
+    attrs:
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      mode: forward_single
+      external_host: https://auth.lab.axiomlayer.com
+
+  # ===================
+  # OIDC Providers (for apps with native OIDC support)
+  # ===================
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-argocd
+    identifiers:
+      name: ArgoCD OIDC Provider
+    attrs:
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      client_type: confidential
+      client_id: argocd
+      # client_secret managed separately via sealed secret
+      redirect_uris:
+        - matching_mode: strict
+          url: https://argocd.lab.axiomlayer.com/auth/callback
+      access_token_validity: hours=1
+      refresh_token_validity: days=30
+      include_claims_in_id_token: true
+      sub_mode: user_email
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-grafana
+    identifiers:
+      name: Grafana OIDC Provider
+    attrs:
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      client_type: confidential
+      client_id: grafana
+      # client_secret managed separately via sealed secret
+      redirect_uris:
+        - matching_mode: strict
+          url: https://grafana.lab.axiomlayer.com/login/generic_oauth
+      access_token_validity: hours=1
+      refresh_token_validity: days=30
+      include_claims_in_id_token: true
+      sub_mode: user_email
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-outline
+    identifiers:
+      name: Outline OIDC Provider
+    attrs:
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      client_type: confidential
+      client_id: outline
+      # client_secret managed separately via sealed secret
+      redirect_uris:
+        - matching_mode: strict
+          url: https://docs.lab.axiomlayer.com/auth/oidc.callback
+      access_token_validity: hours=1
+      refresh_token_validity: days=30
+      include_claims_in_id_token: true
+      sub_mode: user_email
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+
+  # ===================
+  # Outpost (Forward Auth)
+  # ===================
+  - model: authentik_outposts.outpost
+    id: outpost-forward-auth
+    identifiers:
+      name: Forward Auth Outpost
+    attrs:
+      type: proxy
+      providers:
+        - !KeyOf provider-forward-auth
+      config:
+        authentik_host: https://auth.lab.axiomlayer.com
+        docker_labels: null
+        docker_map_ports: true
+        docker_network: null
+        container_image: null
+        kubernetes_replicas: 1
+        kubernetes_namespace: authentik
+        kubernetes_ingress_annotations:
+          traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        kubernetes_ingress_secret_name: ak-outpost-forward-auth-tls
+        kubernetes_service_type: ClusterIP
+        object_naming_template: ak-outpost-%(name)s
+
+  # ===================
+  # Applications - Platform
+  # ===================
+  - model: authentik_core.application
+    id: app-dashboard
+    identifiers:
+      slug: dashboard
+    attrs:
+      name: Dashboard
+      provider: !KeyOf provider-forward-auth
+      meta_launch_url: https://lab.axiomlayer.com
+      meta_icon: https://cdn-icons-png.flaticon.com/512/1828/1828765.png
+      meta_description: Homelab service dashboard
+      policy_engine_mode: any
+      group: Platform
+
+  - model: authentik_core.application
+    id: app-argocd
+    identifiers:
+      slug: argocd
+    attrs:
+      name: ArgoCD
+      provider: !KeyOf provider-argocd
+      meta_launch_url: https://argocd.lab.axiomlayer.com
+      meta_icon: https://argo-cd.readthedocs.io/en/stable/assets/logo.png
+      meta_description: GitOps continuous delivery
+      policy_engine_mode: any
+      group: Platform
+
+  - model: authentik_core.application
+    id: app-authentik
+    identifiers:
+      slug: authentik
+    attrs:
+      name: Authentik
+      meta_launch_url: https://auth.lab.axiomlayer.com
+      meta_icon: https://goauthentik.io/img/icon.png
+      meta_description: Identity provider and SSO
+      policy_engine_mode: any
+      group: Platform
+
+  # ===================
+  # Applications - Apps
+  # ===================
+  - model: authentik_core.application
+    id: app-plane
+    identifiers:
+      slug: plane
+    attrs:
+      name: Plane
+      provider: !KeyOf provider-forward-auth
+      meta_launch_url: https://plane.lab.axiomlayer.com
+      meta_icon: https://plane.so/favicon.ico
+      meta_description: Project management and issue tracking
+      policy_engine_mode: any
+      group: Applications
+
+  - model: authentik_core.application
+    id: app-outline
+    identifiers:
+      slug: outline
+    attrs:
+      name: Outline
+      provider: !KeyOf provider-outline
+      meta_launch_url: https://docs.lab.axiomlayer.com
+      meta_icon: https://www.getoutline.com/images/favicon.png
+      meta_description: Documentation and knowledge base
+      policy_engine_mode: any
+      group: Applications
+
+  - model: authentik_core.application
+    id: app-n8n
+    identifiers:
+      slug: n8n
+    attrs:
+      name: n8n (autom8)
+      provider: !KeyOf provider-forward-auth
+      meta_launch_url: https://autom8.lab.axiomlayer.com
+      meta_icon: https://n8n.io/favicon.ico
+      meta_description: Workflow automation platform
+      policy_engine_mode: any
+      group: Applications
+
+  # ===================
+  # Applications - Observability
+  # ===================
+  - model: authentik_core.application
+    id: app-grafana
+    identifiers:
+      slug: grafana
+    attrs:
+      name: Grafana
+      provider: !KeyOf provider-grafana
+      meta_launch_url: https://grafana.lab.axiomlayer.com
+      meta_icon: https://grafana.com/static/assets/img/fav32.png
+      meta_description: Metrics dashboards and visualization
+      policy_engine_mode: any
+      group: Observability
+
+  - model: authentik_core.application
+    id: app-alertmanager
+    identifiers:
+      slug: alertmanager
+    attrs:
+      name: Alertmanager
+      provider: !KeyOf provider-forward-auth
+      meta_launch_url: https://alerts.lab.axiomlayer.com
+      meta_icon: https://prometheus.io/assets/favicons/favicon.ico
+      meta_description: Alert management and routing
+      policy_engine_mode: any
+      group: Observability
+
+  # ===================
+  # Applications - Infrastructure
+  # ===================
+  - model: authentik_core.application
+    id: app-longhorn
+    identifiers:
+      slug: longhorn
+    attrs:
+      name: Longhorn
+      provider: !KeyOf provider-forward-auth
+      meta_launch_url: https://longhorn.lab.axiomlayer.com
+      meta_icon: https://longhorn.io/img/logos/longhorn-icon-color.png
+      meta_description: Distributed storage management
+      policy_engine_mode: any
+      group: Infrastructure
+
+  - model: authentik_core.application
+    id: app-telnet
+    identifiers:
+      slug: telnet-server
+    attrs:
+      name: Telnet Server
+      provider: !KeyOf provider-forward-auth
+      meta_launch_url: https://telnet.lab.axiomlayer.com
+      meta_icon: https://cdn-icons-png.flaticon.com/512/900/900618.png
+      meta_description: Demo application with SSO
+      policy_engine_mode: any
+      group: Infrastructure
+
+  # ===================
+  # Access Policies
+  # ===================
+  - model: authentik_policies_expression.expressionpolicy
+    id: policy-is-admin
+    identifiers:
+      name: Is Homelab Admin
+    attrs:
+      expression: |
+        return ak_is_group_member(request.user, name="Homelab Admins")
+
+  - model: authentik_policies_expression.expressionpolicy
+    id: policy-is-user
+    identifiers:
+      name: Is Homelab User
+    attrs:
+      expression: |
+        return ak_is_group_member(request.user, name="Homelab Admins") or ak_is_group_member(request.user, name="Homelab Users")
+
+  # ===================
+  # Policy Bindings - ArgoCD (Admin only)
+  # ===================
+  - model: authentik_policies.policybinding
+    id: binding-argocd-admin
+    identifiers:
+      order: 0
+      target: !KeyOf app-argocd
+      policy: !KeyOf policy-is-admin
+    attrs:
+      enabled: true
+      timeout: 30
