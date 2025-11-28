@@ -18,9 +18,13 @@ spec:
           enabled: true
           appHost: plane.lab.axiomlayer.com
           ingressClass: traefik
+          annotations:
+            traefik.ingress.kubernetes.io/router.entrypoints: websecure
+            traefik.ingress.kubernetes.io/router.tls: "true"
 
         ssl:
           createIssuer: false
+          secretName: plane-tls
 
         postgres:
           local_setup: true

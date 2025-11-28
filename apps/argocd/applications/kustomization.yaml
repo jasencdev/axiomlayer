@@ -7,5 +7,6 @@ resources:
   - external-dns.yaml
   - longhorn.yaml
   - plane.yaml
+  - plane-extras.yaml
   - telnet-server.yaml
   - loki.yaml
