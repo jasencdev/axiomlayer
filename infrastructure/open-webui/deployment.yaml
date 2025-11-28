@@ -45,6 +45,7 @@ spec:
                   key: uri
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           resources:
@@ -57,6 +58,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /app/backend/data
+            - name: tmp
+              mountPath: /tmp
           livenessProbe:
             httpGet:
               path: /health
@@ -75,3 +78,5 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: open-webui-data
+        - name: tmp
+          emptyDir: {}
