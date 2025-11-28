@@ -178,7 +178,7 @@ Environment="OLLAMA_HOST=0.0.0.0:11434"
 # Allow connections from any origin (Open WebUI)
 Environment="OLLAMA_ORIGINS=*"
 # Set default context window to 32k tokens
-Environment="OLLAMA_NUM_CTX=32768"
+Environment="OLLAMA_CONTEXT_LENGTH=32768"
 # Keep models loaded longer (5 minutes)
 Environment="OLLAMA_KEEP_ALIVE=5m"
 # Flash attention for better memory efficiency
