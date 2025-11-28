@@ -12,6 +12,7 @@ spec:
     helm:
       releaseName: arc
       values: |
+        installCRDs: true
         authSecret:
           create: false
           name: github-runner-token
