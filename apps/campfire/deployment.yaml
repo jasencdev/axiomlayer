@@ -46,6 +46,8 @@ spec:
                 name: campfire-secret
           securityContext:
             allowPrivilegeEscalation: false
+            # Rails requires writable filesystem for tmp, cache, and asset compilation
+            readOnlyRootFilesystem: false
             capabilities:
               drop: ["ALL"]
           resources:

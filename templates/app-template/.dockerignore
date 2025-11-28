@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Kubernetes manifests (not needed in image)
+k8s/
+
+# Documentation
+README.md
+docs/
+
+# Tests
+tests/
+*.test.js
+coverage/
+
+# Build artifacts
+dist/
+build/
+*.log

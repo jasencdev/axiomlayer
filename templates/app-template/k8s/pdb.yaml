@@ -1,0 +1,15 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{APP_NAME}}-pdb
+  namespace: {{APP_NAME}}
+  labels:
+    app.kubernetes.io/name: {{APP_NAME}}
+    app.kubernetes.io/component: pdb
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  minAvailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{APP_NAME}}

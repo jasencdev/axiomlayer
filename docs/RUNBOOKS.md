@@ -461,13 +461,70 @@ ssh {node} sudo /usr/local/bin/k3s-agent-uninstall.sh
 
 ## Backup and Restore
 
+### Backup Architecture
+
+```
+Longhorn Volumes → NFS Proxy (in-cluster) → UNAS NFS Share
+                   10.43.37.240:/          192.168.1.234:/.../.data/k8s-backup
+```
+
+- **Backup Target**: `nfs://10.43.37.240:/` (NFS proxy service)
+- **NFS Proxy**: Runs on `neko`, mounts UNAS and re-exports `/data/k8s-backup`
+- **Schedule**: Daily at 2 AM UTC, retains 7 backups
+- **Compression**: LZ4
+
+### Volume Reference
+
+Current volumes and their Longhorn IDs (for restore operations):
+
+| Application | PVC | Longhorn Volume |
+|-------------|-----|-----------------|
+| n8n | n8n/n8n-data | pvc-5de7aa5b-2d45-467b-8a4c-ffc5e92d813e |
+| n8n | n8n/n8n-db-1 | pvc-0a260809-b635-456e-b384-543ffc5f6eb3 |
+| Outline | outline/outline-data | pvc-9756bc85-cb36-4bc4-9c7f-f00a9b26a554 |
+| Outline | outline/outline-db-1 | pvc-0058a340-5ce8-45de-a576-f2f9702aaab2 |
+| Open WebUI | open-webui/open-webui-data | pvc-06a1e2bd-0df8-4ee5-8cda-80083848b467 |
+| Open WebUI | open-webui/open-webui-db-1 | pvc-acd7bca6-9465-4c29-8469-398017128a6a |
+| Campfire | campfire/campfire-storage | pvc-e8a29df4-cae8-4136-a617-6f18e169c780 |
+| Authentik | authentik/authentik-db-1 | pvc-6aeea1d0-7173-4942-802f-9c7ac4f48c28 |
+| Plane | plane/pvc-plane-pgdb-vol-* | pvc-ba8acbfb-7a46-4667-b51b-dc8635caa1fa |
+| Plane | plane/pvc-plane-minio-vol-* | pvc-9cf0ab57-9f2b-498f-b9a0-8aff5aadf77d |
+| Loki | monitoring/storage-loki-0 | pvc-44507cad-3fea-457a-965f-490f199688d3 |
+
+Generate current mapping:
+```bash
+kubectl get volumes -n longhorn-system -o json | \
+  jq -r '.items[] | "\(.status.kubernetesStatus.namespace)/\(.status.kubernetesStatus.pvcName) → \(.metadata.name)"' | sort
+```
+
+### Check Backup Status
+
+```bash
+# List all backup volumes
+kubectl get backupvolumes -n longhorn-system
+
+# List recent backups
+kubectl get backups -n longhorn-system --sort-by=.metadata.creationTimestamp | tail -20
+
+# Check backup target health
+kubectl get backuptarget -n longhorn-system default -o yaml
+
+# Verify NFS mount is working
+kubectl exec -n nfs-proxy deploy/nfs-proxy -- ls -la /data/k8s-backup/backupstore/volumes/
+
+# Check backup size
+kubectl exec -n nfs-proxy deploy/nfs-proxy -- du -sh /data/k8s-backup/backupstore/
+```
+
 ### Manual Longhorn Backup
 
 ```bash
 # Via UI
 # Go to Longhorn UI → Volumes → Select volume → Create Backup
 
-# Via kubectl
+# Via kubectl - first create a snapshot, then backup
+VOLUME_NAME=pvc-xxxxx  # Get from: kubectl get volumes -n longhorn-system
+
 kubectl -n longhorn-system create -f - <<EOF
 apiVersion: longhorn.io/v1beta2
 kind: Backup
@@ -476,37 +533,299 @@ metadata:
   namespace: longhorn-system
 spec:
   snapshotName: ""
-  volumeName: {pvc-xxx-xxx}
+  volumeName: ${VOLUME_NAME}
+EOF
+
+# Watch backup progress
+kubectl get backups -n longhorn-system -w
+```
+
+---
+
+### Restore Procedures
+
+#### Method 1: Restore via Longhorn UI (Recommended)
+
+Best for: Quick restores, exploring available backups
+
+1. Access Longhorn UI at https://longhorn.lab.axiomlayer.com
+2. Navigate to **Backup** tab
+3. Find the volume you want to restore (volumes are named by PVC ID)
+4. Click the backup you want to restore
+5. Click **Restore Latest Backup** (or select specific backup)
+6. Enter a **new volume name** (cannot match existing volume name)
+7. Click **OK**
+8. Wait for volume to become `detached` state
+9. Create PV/PVC to use the restored volume (see Step 2 below)
+
+#### Method 2: Restore for Regular Deployments
+
+Use when: Restoring a single volume for a Deployment/StatefulSet with 1 replica
+
+**Step 1: Restore the Volume**
+
+```bash
+# Via Longhorn UI (preferred) or identify the backup
+kubectl get backupvolumes -n longhorn-system
+
+# Note the volume name (e.g., pvc-5de7aa5b-2d45-467b-8a4c-ffc5e92d813e)
+# Restore via UI → Backup → Select volume → Restore Latest Backup
+# Name it something like: restored-n8n-data
+```
+
+**Step 2: Create PersistentVolume pointing to restored volume**
+
+```bash
+# Get the restored volume details
+RESTORED_VOL=restored-n8n-data
+NAMESPACE=n8n
+PVC_NAME=n8n-data
+SIZE=5Gi
+
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${RESTORED_VOL}
+spec:
+  capacity:
+    storage: ${SIZE}
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: longhorn
+  csi:
+    driver: driver.longhorn.io
+    fsType: ext4
+    volumeHandle: ${RESTORED_VOL}
+    volumeAttributes:
+      numberOfReplicas: "3"
+      staleReplicaTimeout: "30"
 EOF
 ```
 
-### Restore from Backup
+**Step 3: Delete old PVC and create new one bound to restored PV**
 
 ```bash
-# 1. Go to Longhorn UI
-# 2. Backup → Select backup → Restore
-# 3. Create new PVC from restored volume
+# Scale down the deployment first
+kubectl scale deployment/${APP_NAME} -n ${NAMESPACE} --replicas=0
 
-# Or create PVC referencing backup
+# Delete the old PVC (this will delete the old Longhorn volume!)
+kubectl delete pvc ${PVC_NAME} -n ${NAMESPACE}
+
+# Create new PVC bound to the restored PV
 kubectl apply -f - <<EOF
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: restored-pvc
-  namespace: {namespace}
+  name: ${PVC_NAME}
+  namespace: ${NAMESPACE}
 spec:
   accessModes:
     - ReadWriteOnce
   storageClassName: longhorn
+  volumeName: ${RESTORED_VOL}
+  resources:
+    requests:
+      storage: ${SIZE}
+EOF
+
+# Scale deployment back up
+kubectl scale deployment/${APP_NAME} -n ${NAMESPACE} --replicas=1
+```
+
+#### Method 3: Restore for StatefulSets (Multiple Replicas)
+
+Use when: Restoring volumes for StatefulSets like PostgreSQL clusters
+
+**Example: Restore a 2-replica PostgreSQL cluster**
+
+```bash
+# 1. Restore both volumes via Longhorn UI
+#    - pvc-xxx (postgres-0) → restored-postgres-0
+#    - pvc-yyy (postgres-1) → restored-postgres-1
+
+# 2. Scale down StatefulSet
+kubectl scale statefulset/postgres -n default --replicas=0
+
+# 3. Delete old PVCs
+kubectl delete pvc postgres-0 postgres-1 -n default
+
+# 4. Create PVs for each restored volume
+for i in 0 1; do
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: restored-postgres-${i}
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: longhorn
+  csi:
+    driver: driver.longhorn.io
+    fsType: ext4
+    volumeHandle: restored-postgres-${i}
+    volumeAttributes:
+      numberOfReplicas: "3"
+      staleReplicaTimeout: "30"
+EOF
+done
+
+# 5. Create PVCs with exact names StatefulSet expects
+for i in 0 1; do
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-postgres-${i}
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  volumeName: restored-postgres-${i}
+  resources:
+    requests:
+      storage: 10Gi
+EOF
+done
+
+# 6. Scale StatefulSet back up
+kubectl scale statefulset/postgres -n default --replicas=2
+```
+
+#### Method 4: Restore to New Namespace (Migration/Testing)
+
+Use when: Testing restore without affecting production, or migrating data
+
+```bash
+# 1. Restore volume via UI with new name: test-restore-n8n
+
+# 2. Create PV and PVC in test namespace
+kubectl create namespace restore-test
+
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: test-restore-n8n
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: longhorn
+  csi:
+    driver: driver.longhorn.io
+    fsType: ext4
+    volumeHandle: test-restore-n8n
+    volumeAttributes:
+      numberOfReplicas: "3"
+      staleReplicaTimeout: "30"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-data
+  namespace: restore-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  volumeName: test-restore-n8n
   resources:
     requests:
       storage: 5Gi
-  dataSource:
-    name: {backup-name}
-    kind: Backup
-    apiGroup: longhorn.io
 EOF
+
+# 3. Create a test pod to verify data
+kubectl run -n restore-test data-check --image=busybox --restart=Never \
+  --overrides='{"spec":{"containers":[{"name":"data-check","image":"busybox","command":["sleep","3600"],"volumeMounts":[{"name":"data","mountPath":"/data"}]}],"volumes":[{"name":"data","persistentVolumeClaim":{"claimName":"test-data"}}]}}'
+
+# 4. Verify data
+kubectl exec -n restore-test data-check -- ls -la /data
+kubectl exec -n restore-test data-check -- cat /data/some-file
+
+# 5. Cleanup
+kubectl delete namespace restore-test
 ```
+
+---
+
+### Troubleshooting Restores
+
+#### "Volume already exists" error
+
+The restored volume name cannot match any existing volume.
+
+```bash
+# Check existing volumes
+kubectl get volumes -n longhorn-system | grep {name}
+
+# Use a unique name like: restored-{app}-{date}
+```
+
+#### Restored volume stuck in "Detached" state
+
+This is normal. The volume attaches when a pod mounts it.
+
+```bash
+# Check volume state
+kubectl get volumes -n longhorn-system {vol-name} -o jsonpath='{.status.state}'
+
+# Create PV/PVC and start a pod to attach it
+```
+
+#### PVC stuck in "Pending"
+
+```bash
+# Check PVC events
+kubectl describe pvc {name} -n {namespace}
+
+# Common issues:
+# - PV volumeName doesn't match
+# - StorageClass mismatch
+# - Size mismatch (PVC size must be <= PV size)
+```
+
+#### Data appears empty after restore
+
+```bash
+# Verify the backup has data
+kubectl get backup {backup-name} -n longhorn-system -o jsonpath='{.status.size}'
+
+# Check the restore completed
+kubectl get volumes -n longhorn-system {vol-name} -o yaml | grep -A5 restoreStatus
+
+# Verify mount inside pod
+kubectl exec -n {namespace} {pod} -- df -h
+kubectl exec -n {namespace} {pod} -- ls -la /path/to/mount
+```
+
+#### NFS proxy not accessible
+
+```bash
+# Check NFS proxy pod
+kubectl get pods -n nfs-proxy
+kubectl logs -n nfs-proxy deploy/nfs-proxy
+
+# Check NFS service
+kubectl get svc -n nfs-proxy
+
+# Test NFS mount from another pod
+kubectl run nfs-test --rm -it --image=busybox --restart=Never -- \
+  sh -c "mount -t nfs 10.43.37.240:/ /mnt && ls /mnt/k8s-backup"
+```
+
+---
 
 ### Backup etcd
 

@@ -1,0 +1,17 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{APP_NAME}}-tls
+  namespace: {{APP_NAME}}
+  labels:
+    app.kubernetes.io/name: {{APP_NAME}}
+    app.kubernetes.io/component: tls
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  secretName: {{APP_NAME}}-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - {{APP_NAME}}.lab.axiomlayer.com

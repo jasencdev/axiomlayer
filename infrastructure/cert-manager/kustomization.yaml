@@ -4,6 +4,7 @@ resources:
   - namespace.yaml
   - cluster-issuer.yaml
   - sealed-secret.yaml
+  - networkpolicy.yaml
 labels:
   - pairs:
       app.kubernetes.io/managed-by: argocd
