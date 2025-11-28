@@ -42,7 +42,6 @@ spec:
         - --source=ingress
         - --domain-filter=lab.axiomlayer.com
         - --provider=cloudflare
-        - --cloudflare-proxied=false
         - --policy=upsert-only
         - --registry=txt
         - --txt-owner-id=homelab-k3s
