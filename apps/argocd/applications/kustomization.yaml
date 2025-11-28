@@ -14,3 +14,4 @@ resources:
   - telnet-server.yaml
   - loki.yaml
   - nfs-proxy.yaml
+  - open-webui.yaml

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: open-webui-config
+  namespace: open-webui
+  labels:
+    app.kubernetes.io/name: open-webui
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+data:
+  # Ollama connection - update OLLAMA_HOST with your workstation's Tailscale IP
+  OLLAMA_BASE_URL: "http://WORKSTATION_TAILSCALE_IP:11434"
+  # Disable bundled Ollama since we're using external
+  ENABLE_OLLAMA_API: "true"
+  # WebUI settings
+  WEBUI_NAME: "AxiomLayer AI"
+  WEBUI_URL: "https://ai.lab.axiomlayer.com"
+  # Auth settings - using Authentik for SSO
+  ENABLE_SIGNUP: "false"
+  DEFAULT_USER_ROLE: "user"
+  # Disable OpenAI by default (can enable later if needed)
+  ENABLE_OPENAI_API: "false"
