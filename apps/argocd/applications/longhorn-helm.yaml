@@ -10,11 +10,14 @@ spec:
     chart: longhorn
     targetRevision: 1.7.2
     helm:
+      skipCrds: false
       values: |
         persistence:
           defaultClassReplicaCount: 1
         defaultSettings:
           defaultReplicaCount: 1
+        preUpgradeChecker:
+          jobEnabled: false
   destination:
     server: https://kubernetes.default.svc
     namespace: longhorn-system
@@ -24,3 +27,5 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true
