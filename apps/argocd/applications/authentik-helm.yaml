@@ -61,6 +61,32 @@ spec:
           volumeMounts:
             - name: blueprints
               mountPath: /blueprints/custom
+        # Service account for outpost management
+        serviceAccount:
+          create: true
+        # RBAC for deploying outposts to Kubernetes
+        rbac:
+          create: true
+          createClusterRole: true
+          clusterRoleRules:
+            - apiGroups: [""]
+              resources: ["namespaces", "pods", "services", "secrets", "configmaps", "serviceaccounts"]
+              verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+            - apiGroups: ["apps"]
+              resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+              verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+            - apiGroups: ["networking.k8s.io"]
+              resources: ["ingresses"]
+              verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+            - apiGroups: ["rbac.authorization.k8s.io"]
+              resources: ["roles", "rolebindings"]
+              verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+            - apiGroups: ["apiextensions.k8s.io"]
+              resources: ["customresourcedefinitions"]
+              verbs: ["list"]
+            - apiGroups: ["traefik.io", "traefik.containo.us"]
+              resources: ["middlewares"]
+              verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   destination:
     server: https://kubernetes.default.svc
     namespace: authentik
