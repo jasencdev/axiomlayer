@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: campfire
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "8"
   labels:
     app.kubernetes.io/name: campfire
     app.kubernetes.io/component: application
