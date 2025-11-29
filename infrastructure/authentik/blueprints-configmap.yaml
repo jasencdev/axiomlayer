@@ -203,6 +203,17 @@ data:
           signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
 
       # ===================
+      # Kubernetes Service Connection (for outpost deployment)
+      # ===================
+      - model: authentik_outposts.kubernetesserviceconnection
+        id: k8s-local
+        identifiers:
+          name: Local Kubernetes
+        attrs:
+          local: true
+          verify_ssl: true
+
+      # ===================
       # Outpost (Forward Auth)
       # ===================
       - model: authentik_outposts.outpost
@@ -211,6 +222,7 @@ data:
           name: forward-auth-outpost
         attrs:
           type: proxy
+          service_connection: !KeyOf k8s-local
           providers:
             - !KeyOf provider-dashboard
             - !KeyOf provider-n8n
