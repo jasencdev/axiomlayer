@@ -164,24 +164,15 @@ data:
           sub_mode: user_email
           signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
 
-      - model: authentik_providers_oauth2.oauth2provider
+      - model: authentik_providers_proxy.proxyprovider
         id: provider-outline
         identifiers:
-          name: Outline OIDC Provider
+          name: Outline Proxy Provider
         attrs:
           authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
           invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
-          client_type: confidential
-          client_id: outline
-          client_secret: "outline-oidc-secret-change-me"
-          redirect_uris:
-            - matching_mode: strict
-              url: https://docs.lab.axiomlayer.com/auth/oidc.callback
-          access_token_validity: hours=1
-          refresh_token_validity: days=30
-          include_claims_in_id_token: true
-          sub_mode: user_email
-          signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+          mode: forward_single
+          external_host: https://docs.lab.axiomlayer.com
 
       - model: authentik_providers_oauth2.oauth2provider
         id: provider-plane
@@ -231,6 +222,7 @@ data:
             - !KeyOf provider-alertmanager
             - !KeyOf provider-longhorn
             - !KeyOf provider-telnet
+            - !KeyOf provider-outline
           config:
             authentik_host: https://auth.lab.axiomlayer.com
             docker_labels: null

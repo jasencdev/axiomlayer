@@ -91,26 +91,6 @@ spec:
           value: "local"
         - name: FILE_STORAGE_LOCAL_ROOT_DIR
           value: "/var/lib/outline/data"
-        - name: OIDC_CLIENT_ID
-          valueFrom:
-            secretKeyRef:
-              name: outline-secrets
-              key: oidc-client-id
-        - name: OIDC_CLIENT_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: outline-secrets
-              key: oidc-client-secret
-        - name: OIDC_AUTH_URI
-          value: "https://auth.lab.axiomlayer.com/application/o/authorize/"
-        - name: OIDC_TOKEN_URI
-          value: "https://auth.lab.axiomlayer.com/application/o/token/"
-        - name: OIDC_USERINFO_URI
-          value: "https://auth.lab.axiomlayer.com/application/o/userinfo/"
-        - name: OIDC_DISPLAY_NAME
-          value: "Authentik"
-        - name: OIDC_USERNAME_CLAIM
-          value: "preferred_username"
         volumeMounts:
         - name: data
           mountPath: /var/lib/outline/data
