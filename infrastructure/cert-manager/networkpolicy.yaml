@@ -27,7 +27,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/instance: cert-manager
+      app.kubernetes.io/instance: cert-manager-helm
   policyTypes:
     - Egress
   egress:
@@ -51,6 +51,19 @@ spec:
           port: 443
         - protocol: TCP
           port: 6443
+    # Allow external DNS for DNS-01 challenge verification
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
     # Allow ACME HTTP-01 challenges (Let's Encrypt)
     - to:
         - ipBlock:
@@ -83,4 +96,4 @@ spec:
     # Allow Kubernetes API server to call the webhook
     - ports:
         - protocol: TCP
-          port: 10250
+          port: 443

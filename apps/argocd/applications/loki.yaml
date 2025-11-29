@@ -11,6 +11,10 @@ spec:
     targetRevision: 2.10.2
     helm:
       values: |
+        grafana:
+          sidecar:
+            datasources:
+              isDefaultDatasource: false
         promtail:
           enabled: true
         loki:

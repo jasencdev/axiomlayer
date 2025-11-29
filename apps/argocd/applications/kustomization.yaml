@@ -8,6 +8,7 @@ resources:
   - authentik-helm.yaml
   - campfire.yaml
   - cert-manager.yaml
+  - cert-manager-helm.yaml
   - cloudnative-pg.yaml
   - dashboard.yaml
   - external-dns.yaml
