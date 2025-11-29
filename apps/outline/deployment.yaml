@@ -104,9 +104,9 @@ spec:
         - name: OIDC_AUTH_URI
           value: "https://auth.lab.axiomlayer.com/application/o/authorize/"
         - name: OIDC_TOKEN_URI
-          value: "http://authentik-helm-server.authentik.svc/application/o/token/"
+          value: "https://auth.lab.axiomlayer.com/application/o/token/"
         - name: OIDC_USERINFO_URI
-          value: "http://authentik-helm-server.authentik.svc/application/o/userinfo/"
+          value: "https://auth.lab.axiomlayer.com/application/o/userinfo/"
         - name: OIDC_DISPLAY_NAME
           value: "Authentik"
         - name: OIDC_USERNAME_CLAIM
