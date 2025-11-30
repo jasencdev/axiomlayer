@@ -13,7 +13,7 @@ data:
   OLLAMA_BASE_URL: "http://100.115.3.88:11434"
   # RAG/Embedding configuration (panther node)
   RAG_EMBEDDING_ENGINE: "ollama"
-  RAG_EMBEDDING_MODEL: "llama3.2:3b"
+  RAG_EMBEDDING_MODEL: "granite4:3b"
   RAG_OLLAMA_BASE_URL: "http://100.79.124.94:11434"
   # WebUI settings
   WEBUI_NAME: "AxiomLayer AI"
