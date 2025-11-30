@@ -506,8 +506,11 @@ done
 section "DNS Resolution"
 
 # Test internal DNS resolution
-DNS_TEST=$(kubectl run dns-test --image=busybox:1.36 --rm -i --restart=Never --timeout=30s -- nslookup kubernetes.default.svc.cluster.local 2>/dev/null | grep -c "Address" || echo 0)
-if [ "$DNS_TEST" -gt 0 ]; then
+DNS_TEST=$(kubectl run dns-test --image=busybox:1.36 --rm -i --restart=Never --timeout=30s -- nslookup kubernetes.default.svc.cluster.local 2>/dev/null | grep -c "Address" || true)
+DNS_TEST="${DNS_TEST:-0}"
+# Ensure DNS_TEST is a single integer
+DNS_TEST=$(echo "$DNS_TEST" | head -1 | tr -d '[:space:]')
+if [ -n "$DNS_TEST" ] && [ "$DNS_TEST" -gt 0 ] 2>/dev/null; then
     pass "Internal DNS resolution working"
 else
     warn "Internal DNS test inconclusive"
@@ -590,10 +593,10 @@ section "Secrets Validation"
 # Check critical secrets exist
 CRITICAL_SECRETS=(
     "argocd:argocd-secret"
-    "authentik:authentik-secret"
+    "authentik:authentik-helm-secrets"
     "cert-manager:cloudflare-api-token"
-    "monitoring:grafana-oidc"
-    "outline:outline-oidc"
+    "monitoring:grafana-oidc-secret"
+    "outline:outline-secrets"
     "n8n:n8n-secrets"
 )
 
