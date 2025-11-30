@@ -52,7 +52,8 @@ homelab-gitops/
 │   ├── test-auth.sh          # Authentication flows (14 tests)
 │   └── validate-manifests.sh # Kustomize validation (20 checks)
 ├── scripts/                  # Provisioning scripts
-│   └── provision-k3s-server.sh
+│   ├── provision-k3s-server.sh  # K3s node setup
+│   └── bootstrap-argocd.sh      # ArgoCD + GitOps bootstrap
 ├── .env                      # Secrets for sealed secrets (not committed)
 └── .github/workflows/        # CI/CD pipeline
     └── ci.yaml               # Main workflow
@@ -423,6 +424,36 @@ These are known and acceptable:
 ### Authentik Blueprints
 - Blueprints don't update client_secret after initial creation
 - Manual database update required for OIDC secret changes
+
+## Disaster Recovery / Bootstrap
+
+### Recovery Order
+1. **K3s Cluster** - `scripts/provision-k3s-server.sh`
+2. **ArgoCD + Sealed Secrets** - `scripts/bootstrap-argocd.sh`
+3. **Sync root app** - ArgoCD UI or `argocd app sync applications`
+4. **Re-seal secrets** - New Sealed Secrets controller = new keys
+
+### Full Cluster Rebuild
+```bash
+# 1. Provision K3s nodes
+sudo ./scripts/provision-k3s-server.sh jasen --init          # First node
+sudo ./scripts/provision-k3s-server.sh jasen --join <IP>     # Additional nodes
+
+# 2. Bootstrap ArgoCD (from any node with kubectl access)
+./scripts/bootstrap-argocd.sh
+
+# 3. Re-seal all secrets (new controller = new keys)
+kubeseal --fetch-cert > sealed-secrets-pub.pem
+# Update all sealed secrets using .env values
+
+# 4. Sync root application in ArgoCD UI
+# This deploys all child apps
+```
+
+### Important Notes
+- **Sealed Secrets**: New cluster = new encryption keys. All sealed secrets must be re-sealed.
+- **Database backups**: Restore from NAS at 192.168.1.234
+- **ArgoCD self-management**: `argocd-helm` app has manual sync only to prevent chicken/egg
 
 ## Documentation
 
