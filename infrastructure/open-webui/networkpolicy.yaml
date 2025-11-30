@@ -71,10 +71,17 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # Allow Ollama API on siberian via Tailscale (100.115.3.88)
+    # Allow Ollama API on siberian via Tailscale (generation)
     - to:
         - ipBlock:
             cidr: 100.115.3.88/32
+      ports:
+        - protocol: TCP
+          port: 11434
+    # Allow Ollama API on panther via Tailscale (embeddings)
+    - to:
+        - ipBlock:
+            cidr: 100.79.124.94/32
       ports:
         - protocol: TCP
           port: 11434
