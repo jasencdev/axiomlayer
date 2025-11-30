@@ -86,6 +86,15 @@ jobs:
       - name: Scan for secrets
         run: trivy fs . --scanners secret --exit-code 1
 
+      - name: Check for plaintext secrets
+        run: |
+          echo "Checking for plaintext Secret resources (should use SealedSecret)..."
+          if grep -rn "kind: Secret" --include="*.yaml" apps/ infrastructure/ | grep -v "SealedSecret" | grep -v "kind: SealedSecret"; then
+            echo "ERROR: Found plaintext Secret. Use SealedSecret instead."
+            exit 1
+          fi
+          echo "No plaintext secrets found"
+
   # Gate job - only passes when all CI checks pass
   ci-passed:
     name: CI Passed

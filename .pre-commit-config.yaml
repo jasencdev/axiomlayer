@@ -1,0 +1,21 @@
+repos:
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: [-d, relaxed]
+
+  - repo: local
+    hooks:
+      - id: no-plaintext-secrets
+        name: Check for plaintext secrets
+        entry: bash -c 'if grep -rn "kind: Secret" --include="*.yaml" apps/ infrastructure/ 2>/dev/null | grep -v SealedSecret | grep -v "kind: SealedSecret"; then echo "ERROR: Found plaintext Secret. Use SealedSecret instead." && exit 1; fi'
+        language: system
+        pass_filenames: false
+
+      - id: validate-kustomize
+        name: Validate kustomize builds
+        entry: bash -c 'for dir in apps/*/; do if [ -f "$dir/kustomization.yaml" ]; then kubectl kustomize "$dir" > /dev/null || exit 1; fi; done'
+        language: system
+        pass_filenames: false
+        files: '\.yaml$'
