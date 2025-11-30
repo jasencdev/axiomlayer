@@ -4,6 +4,7 @@ resources:
   - actions-runner-controller.yaml
   - actions-runner-infra.yaml
   - alertmanager.yaml
+  - argocd-helm.yaml
   - backups.yaml
   - authentik.yaml
   - authentik-helm.yaml

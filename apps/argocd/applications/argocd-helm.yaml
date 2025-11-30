@@ -1,0 +1,72 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-helm
+  namespace: argocd
+  annotations:
+    # Sync wave 0 - ArgoCD should be one of the first things deployed
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    # Prevent accidental deletion - requires manual removal
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-cd
+    targetRevision: 8.0.14
+    helm:
+      values: |
+        global:
+          domain: argocd.lab.axiomlayer.com
+
+        configs:
+          cm:
+            url: https://argocd.lab.axiomlayer.com
+            # OIDC config managed separately via configmaps.yaml
+          params:
+            server.insecure: true  # TLS terminated at Traefik
+
+        server:
+          ingress:
+            enabled: false  # Managed separately via ingress.yaml
+
+        redis:
+          enabled: true
+
+        dex:
+          enabled: true
+
+        notifications:
+          enabled: true
+
+        applicationSet:
+          enabled: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  # IMPORTANT: Manual sync only to prevent chicken/egg issues
+  # Auto-sync disabled - upgrades require explicit manual sync
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+  # Ignore differences in resources that ArgoCD manages itself
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: argocd-secret
+      jsonPointers:
+        - /data
+    - group: ""
+      kind: ConfigMap
+      name: argocd-cm
+      jsonPointers:
+        - /data
+    - group: ""
+      kind: ConfigMap
+      name: argocd-rbac-cm
+      jsonPointers:
+        - /data

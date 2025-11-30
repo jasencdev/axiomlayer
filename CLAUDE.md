@@ -445,8 +445,8 @@ Full documentation in Outline at https://docs.lab.axiomlayer.com:
 
 - Root application (`applications`) uses manual sync - triggered by CI after tests pass
 - Child applications use auto-sync with prune and selfHeal
-- ArgoCD excluded from self-management to prevent loops
-- Helm charts (Authentik, Longhorn, kube-prometheus-stack, cert-manager, actions-runner-controller) installed via ArgoCD Helm source
+- ArgoCD self-manages via `argocd-helm` app with **manual sync only** (prevents chicken/egg issues)
+- Helm charts (ArgoCD, Authentik, Longhorn, kube-prometheus-stack, cert-manager, actions-runner-controller) installed via ArgoCD Helm source
 - TLS termination at Traefik; internal services use HTTP
 - Ollama for LLM generation runs on siberian (GPU workstation, RTX 5070 Ti) via Tailscale at 100.115.3.88:11434
 - Ollama for embeddings runs on panther (RTX 3050 Ti) via Tailscale at 100.79.124.94:11434
