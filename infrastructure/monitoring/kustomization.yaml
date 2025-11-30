@@ -6,3 +6,4 @@ resources:
   - grafana-oidc-sealed-secret.yaml
   - grafana-db-cluster.yaml
   - grafana-db-networkpolicy.yaml
+  - grafana-configmap.yaml
