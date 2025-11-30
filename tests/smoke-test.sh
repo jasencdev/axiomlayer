@@ -54,12 +54,23 @@ fi
 
 section "Core Services"
 
-# ArgoCD
-if kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server --no-headers | grep -q "Running"; then
-    pass "ArgoCD server is running"
-else
-    fail "ArgoCD server is not running"
-fi
+# ArgoCD components
+ARGOCD_COMPONENTS=(
+    "argocd-server:ArgoCD Server"
+    "argocd-repo-server:ArgoCD Repo Server"
+    "argocd-application-controller:ArgoCD Application Controller"
+    "argocd-redis:ArgoCD Redis"
+)
+
+for component in "${ARGOCD_COMPONENTS[@]}"; do
+    LABEL="${component%%:*}"
+    NAME="${component##*:}"
+    if kubectl get pods -n argocd -l "app.kubernetes.io/name=$LABEL" --no-headers 2>/dev/null | grep -q "Running"; then
+        pass "$NAME is running"
+    else
+        fail "$NAME is not running"
+    fi
+done
 
 # Traefik
 if kubectl get pods -n kube-system -l app.kubernetes.io/name=traefik --no-headers | grep -q "Running"; then
@@ -68,11 +79,56 @@ else
     fail "Traefik ingress is not running"
 fi
 
-# Cert-manager
-if kubectl get pods -n cert-manager -l app.kubernetes.io/name=cert-manager --no-headers | grep -q "Running"; then
-    pass "cert-manager is running"
+# Cert-manager components
+CERTMANAGER_COMPONENTS=(
+    "cert-manager:cert-manager"
+    "webhook:cert-manager-webhook"
+    "cainjector:cert-manager-cainjector"
+)
+
+for component in "${CERTMANAGER_COMPONENTS[@]}"; do
+    LABEL="${component%%:*}"
+    NAME="${component##*:}"
+    if kubectl get pods -n cert-manager -l "app.kubernetes.io/name=$LABEL" --no-headers 2>/dev/null | grep -q "Running"; then
+        pass "$NAME is running"
+    else
+        fail "$NAME is not running"
+    fi
+done
+
+# Sealed Secrets controller
+if kubectl get pods -n kube-system -l app.kubernetes.io/name=sealed-secrets --no-headers 2>/dev/null | grep -q "Running"; then
+    pass "Sealed Secrets controller is running"
 else
-    fail "cert-manager is not running"
+    fail "Sealed Secrets controller is not running"
+fi
+
+# External DNS
+if kubectl get pods -n external-dns -l app.kubernetes.io/name=external-dns --no-headers 2>/dev/null | grep -q "Running"; then
+    pass "External DNS is running"
+else
+    fail "External DNS is not running"
+fi
+
+# CloudNativePG operator
+if kubectl get pods -n cnpg-system -l app.kubernetes.io/name=cloudnative-pg --no-headers 2>/dev/null | grep -q "Running"; then
+    pass "CloudNativePG operator is running"
+else
+    fail "CloudNativePG operator is not running"
+fi
+
+# Actions Runner Controller
+if kubectl get pods -n actions-runner -l app.kubernetes.io/name=actions-runner-controller --no-headers 2>/dev/null | grep -q "Running"; then
+    pass "Actions Runner Controller is running"
+else
+    fail "Actions Runner Controller is not running"
+fi
+
+# NFS Proxy
+if kubectl get pods -n nfs-proxy -l app.kubernetes.io/name=nfs-proxy --no-headers 2>/dev/null | grep -q "Running"; then
+    pass "NFS Proxy is running"
+else
+    fail "NFS Proxy is not running"
 fi
 
 section "Authentication"
@@ -122,6 +178,43 @@ if kubectl get pods -n monitoring -l app.kubernetes.io/name=grafana --no-headers
     pass "Grafana is running"
 else
     fail "Grafana is not running"
+fi
+
+# Alertmanager
+if kubectl get pods -n monitoring -l app.kubernetes.io/name=alertmanager --no-headers 2>/dev/null | grep -q "Running"; then
+    pass "Alertmanager is running"
+else
+    fail "Alertmanager is not running"
+fi
+
+# Loki (StatefulSet, check by pod name pattern)
+if kubectl get pods -n monitoring --no-headers 2>/dev/null | grep "^loki-[0-9]" | grep -q "Running"; then
+    pass "Loki is running"
+else
+    fail "Loki is not running"
+fi
+
+# Promtail
+PROMTAIL_PODS=$(kubectl get pods -n monitoring -l app.kubernetes.io/name=promtail --no-headers 2>/dev/null | grep -c "Running" || echo 0)
+if [ "$PROMTAIL_PODS" -gt 0 ]; then
+    pass "Promtail is running ($PROMTAIL_PODS pods)"
+else
+    fail "Promtail is not running"
+fi
+
+# Kube-state-metrics
+if kubectl get pods -n monitoring -l app.kubernetes.io/name=kube-state-metrics --no-headers 2>/dev/null | grep -q "Running"; then
+    pass "kube-state-metrics is running"
+else
+    fail "kube-state-metrics is not running"
+fi
+
+# Node exporter
+NODE_EXPORTER_PODS=$(kubectl get pods -n monitoring -l app.kubernetes.io/name=prometheus-node-exporter --no-headers 2>/dev/null | grep -c "Running" || echo 0)
+if [ "$NODE_EXPORTER_PODS" -gt 0 ]; then
+    pass "Node exporter is running ($NODE_EXPORTER_PODS pods)"
+else
+    fail "Node exporter is not running"
 fi
 
 section "Databases"
@@ -204,6 +297,58 @@ if kubectl get pods -n campfire -l app.kubernetes.io/name=campfire --no-headers 
 else
     fail "Campfire is not running"
 fi
+
+# Telnet Server (demo app)
+if kubectl get pods -n telnet-server -l app.kubernetes.io/name=telnet-server --no-headers 2>/dev/null | grep -q "Running"; then
+    pass "Telnet Server is running"
+else
+    fail "Telnet Server is not running"
+fi
+
+section "Plane Components"
+
+# Plane uses its own StatefulSets for databases and services
+PLANE_STATEFULSETS=(
+    "plane-pgdb-wl:Plane PostgreSQL"
+    "plane-redis-wl:Plane Redis"
+    "plane-minio-wl:Plane MinIO"
+    "plane-rabbitmq-wl:Plane RabbitMQ"
+)
+
+for sts in "${PLANE_STATEFULSETS[@]}"; do
+    NAME="${sts%%:*}"
+    LABEL="${sts##*:}"
+    if kubectl get pods -n plane -l "statefulset.kubernetes.io/pod-name=${NAME}-0" --no-headers 2>/dev/null | grep -q "Running"; then
+        pass "$LABEL is running"
+    else
+        fail "$LABEL is not running"
+    fi
+done
+
+# Plane deployments
+PLANE_DEPLOYMENTS=(
+    "plane-api-wl:Plane API"
+    "plane-web-wl:Plane Web"
+    "plane-space-wl:Plane Space"
+    "plane-admin-wl:Plane Admin"
+    "plane-live-wl:Plane Live"
+    "plane-beat-worker-wl:Plane Beat Worker"
+)
+
+for deploy in "${PLANE_DEPLOYMENTS[@]}"; do
+    NAME="${deploy%%:*}"
+    LABEL="${deploy##*:}"
+    if kubectl get pods -n plane -l "app.kubernetes.io/name=$NAME" --no-headers 2>/dev/null | grep -q "Running"; then
+        pass "$LABEL is running"
+    else
+        # Try matching by deployment name in pod name
+        if kubectl get pods -n plane --no-headers 2>/dev/null | grep "$NAME" | grep -q "Running"; then
+            pass "$LABEL is running"
+        else
+            warn "$LABEL may not be running"
+        fi
+    fi
+done
 
 section "Certificates"
 
@@ -393,6 +538,107 @@ check_endpoint "Open WebUI" "https://ai.lab.axiomlayer.com/" "302"
 check_endpoint "Plane" "https://plane.lab.axiomlayer.com/" "200"
 check_endpoint "Longhorn" "https://longhorn.lab.axiomlayer.com/" "302"
 check_endpoint "Alertmanager" "https://alerts.lab.axiomlayer.com/" "302"
+check_endpoint "Campfire" "https://chat.lab.axiomlayer.com/" "302"
+
+section "Service Endpoints"
+
+# Check internal services are accessible
+check_service() {
+    local name=$1
+    local namespace=$2
+    local service=$3
+    local port=$4
+
+    SVC_IP=$(kubectl get svc "$service" -n "$namespace" -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
+    if [ -n "$SVC_IP" ] && [ "$SVC_IP" != "None" ]; then
+        pass "$name service exists ($namespace/$service)"
+    else
+        fail "$name service not found ($namespace/$service)"
+    fi
+}
+
+check_service "Dashboard" "dashboard" "dashboard" "80"
+check_service "Outline" "outline" "outline" "3000"
+check_service "n8n" "n8n" "n8n" "5678"
+check_service "Open WebUI" "open-webui" "open-webui" "8080"
+check_service "Campfire" "campfire" "campfire" "3000"
+check_service "Authentik" "authentik" "authentik-helm-server" "80"
+check_service "Grafana" "monitoring" "kube-prometheus-stack-grafana" "80"
+check_service "Prometheus" "monitoring" "kube-prometheus-stack-prometheus" "9090"
+check_service "Alertmanager" "monitoring" "kube-prometheus-stack-alertmanager" "9093"
+check_service "Loki" "monitoring" "loki" "3100"
+check_service "Longhorn UI" "longhorn-system" "longhorn-frontend" "80"
+
+section "Ingress Resources"
+
+# Check all ingresses have addresses assigned
+INGRESSES=$(kubectl get ingress -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}:{.status.loadBalancer.ingress[0].ip}{"\n"}{end}' 2>/dev/null)
+INGRESS_ISSUES=0
+while IFS=: read -r ingress_name ingress_ip; do
+    if [ -n "$ingress_name" ]; then
+        if [ -n "$ingress_ip" ]; then
+            pass "Ingress $ingress_name has IP $ingress_ip"
+        else
+            warn "Ingress $ingress_name has no IP assigned"
+            INGRESS_ISSUES=$((INGRESS_ISSUES + 1))
+        fi
+    fi
+done <<< "$INGRESSES"
+
+section "Secrets Validation"
+
+# Check critical secrets exist
+CRITICAL_SECRETS=(
+    "argocd:argocd-secret"
+    "authentik:authentik-secret"
+    "cert-manager:cloudflare-api-token"
+    "monitoring:grafana-oidc"
+    "outline:outline-oidc"
+    "n8n:n8n-secrets"
+)
+
+for secret in "${CRITICAL_SECRETS[@]}"; do
+    NS="${secret%%:*}"
+    NAME="${secret##*:}"
+    if kubectl get secret "$NAME" -n "$NS" --no-headers 2>/dev/null | grep -q "$NAME"; then
+        pass "Secret $NS/$NAME exists"
+    else
+        warn "Secret $NS/$NAME not found"
+    fi
+done
+
+section "ConfigMaps Validation"
+
+# Check critical configmaps exist
+CRITICAL_CONFIGMAPS=(
+    "argocd:argocd-cm"
+    "argocd:argocd-rbac-cm"
+    "authentik:authentik-blueprints"
+)
+
+for cm in "${CRITICAL_CONFIGMAPS[@]}"; do
+    NS="${cm%%:*}"
+    NAME="${cm##*:}"
+    if kubectl get configmap "$NAME" -n "$NS" --no-headers 2>/dev/null | grep -q "$NAME"; then
+        pass "ConfigMap $NS/$NAME exists"
+    else
+        warn "ConfigMap $NS/$NAME not found"
+    fi
+done
+
+section "ClusterIssuers"
+
+# Check Let's Encrypt ClusterIssuers
+if kubectl get clusterissuer letsencrypt-prod --no-headers 2>/dev/null | grep -q "letsencrypt-prod"; then
+    ISSUER_STATUS=$(kubectl get clusterissuer letsencrypt-prod -o jsonpath='{.status.conditions[0].status}' 2>/dev/null || echo "Unknown")
+    if [ "$ISSUER_STATUS" = "True" ]; then
+        pass "ClusterIssuer letsencrypt-prod is ready"
+    else
+        fail "ClusterIssuer letsencrypt-prod is not ready"
+    fi
+else
+    fail "ClusterIssuer letsencrypt-prod not found"
+fi
 
 section "Summary"
 
