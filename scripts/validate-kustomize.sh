@@ -1,5 +1,6 @@
 #!/bin/bash
 # Validate all kustomize builds
+set -euo pipefail
 
 for dir in apps/*/; do
     if [ -f "$dir/kustomization.yaml" ]; then
