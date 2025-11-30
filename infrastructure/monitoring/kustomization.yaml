@@ -3,3 +3,4 @@ kind: Kustomization
 namespace: monitoring
 resources:
   - grafana-certificate.yaml
+  - grafana-oidc-sealed-secret.yaml

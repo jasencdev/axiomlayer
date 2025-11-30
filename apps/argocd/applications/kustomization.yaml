@@ -24,4 +24,5 @@ resources:
   - outline.yaml
   - plane.yaml
   - plane-extras.yaml
+  - sealed-secrets.yaml
   - telnet-server.yaml
