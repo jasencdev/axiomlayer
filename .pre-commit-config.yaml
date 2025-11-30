@@ -1,0 +1,22 @@
+repos:
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: [-c, .yamllint.yaml]
+        exclude: ^(infrastructure/authentik/openapi-schema\.yml|infrastructure/sealed-secrets/crd\.yaml|templates/.*)$
+
+  - repo: local
+    hooks:
+      - id: no-plaintext-secrets
+        name: Check for plaintext secrets
+        language: system
+        entry: ./scripts/check-no-plaintext-secrets.sh
+        pass_filenames: false
+
+      - id: validate-kustomize
+        name: Validate kustomize builds
+        language: system
+        entry: ./scripts/validate-kustomize.sh
+        pass_filenames: false
+        files: \.yaml$

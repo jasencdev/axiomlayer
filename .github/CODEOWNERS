@@ -1,0 +1,13 @@
+# Default owner for everything
+* @jasencdev
+
+# Critical infrastructure - requires explicit review
+infrastructure/authentik/ @jasencdev
+infrastructure/cert-manager/ @jasencdev
+infrastructure/cloudnative-pg/ @jasencdev
+infrastructure/longhorn/ @jasencdev
+infrastructure/sealed-secrets/ @jasencdev
+apps/argocd/ @jasencdev
+
+# CI/CD pipeline
+.github/ @jasencdev
