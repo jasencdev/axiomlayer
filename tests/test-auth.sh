@@ -175,24 +175,26 @@ else
     fail "ArgoCD auth callback endpoint not responding (HTTP $ARGOCD_CALLBACK)"
 fi
 
-# Verify ArgoCD OIDC config in cluster
-ARGOCD_OIDC_CONFIG=$(kubectl get configmap argocd-cm -n argocd -o jsonpath='{.data.oidc\.config}' 2>/dev/null)
-if echo "$ARGOCD_OIDC_CONFIG" | grep -q "auth.lab.axiomlayer.com"; then
-    pass "ArgoCD OIDC configured to use Authentik"
+# Verify ArgoCD Dex config in cluster (ArgoCD uses Dex which connects to Authentik)
+ARGOCD_DEX_CONFIG=$(kubectl get configmap argocd-cm -n argocd -o jsonpath='{.data.dex\.config}' 2>/dev/null)
+if echo "$ARGOCD_DEX_CONFIG" | grep -q "auth.lab.axiomlayer.com"; then
+    pass "ArgoCD Dex configured to use Authentik as OIDC provider"
 else
-    fail "ArgoCD OIDC not configured for Authentik"
+    fail "ArgoCD Dex not configured for Authentik"
 fi
 
-# Verify ArgoCD can initiate OIDC flow (should redirect to Authentik authorize endpoint)
-ARGOCD_LOGIN_RESP=$(curl -sk "https://argocd.lab.axiomlayer.com/auth/login?return_url=https://argocd.lab.axiomlayer.com/" 2>/dev/null)
+# Verify ArgoCD can initiate OIDC flow (redirects to Dex which then redirects to Authentik)
 ARGOCD_LOGIN_STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "https://argocd.lab.axiomlayer.com/auth/login?return_url=https://argocd.lab.axiomlayer.com/" 2>/dev/null)
 ARGOCD_LOGIN_LOCATION=$(curl -sk -I "https://argocd.lab.axiomlayer.com/auth/login?return_url=https://argocd.lab.axiomlayer.com/" 2>/dev/null | grep -i "location:" | head -1)
 
 if [ "$ARGOCD_LOGIN_STATUS" = "302" ] || [ "$ARGOCD_LOGIN_STATUS" = "303" ] || [ "$ARGOCD_LOGIN_STATUS" = "307" ]; then
-    if echo "$ARGOCD_LOGIN_LOCATION" | grep -q "auth.lab.axiomlayer.com"; then
+    # ArgoCD redirects to Dex (/api/dex/auth) which then redirects to Authentik
+    if echo "$ARGOCD_LOGIN_LOCATION" | grep -q "/api/dex/auth"; then
+        pass "ArgoCD OIDC login redirects to Dex (which connects to Authentik)"
+    elif echo "$ARGOCD_LOGIN_LOCATION" | grep -q "auth.lab.axiomlayer.com"; then
         pass "ArgoCD OIDC login redirects to Authentik"
     else
-        fail "ArgoCD OIDC login redirects but not to Authentik (location: $ARGOCD_LOGIN_LOCATION)"
+        fail "ArgoCD OIDC login redirects but not to Dex or Authentik (location: $ARGOCD_LOGIN_LOCATION)"
     fi
 elif [ "$ARGOCD_LOGIN_STATUS" = "400" ]; then
     fail "ArgoCD OIDC login returns 400 - invalid redirect URL configuration"
