@@ -16,7 +16,7 @@ spec:
         grafana:
           sidecar:
             datasources:
-              isDefaultDatasource: false
+              enabled: false
         promtail:
           enabled: true
         loki:
