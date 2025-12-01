@@ -75,6 +75,28 @@ check_prerequisites() {
     fi
 
     pass "kubectl available and cluster accessible"
+
+    # Check if we have write permissions (for tests that need create/exec)
+    # Try to do a dry-run create to test permissions
+    if kubectl auth can-i create jobs -n "$BACKUP_NAMESPACE" &> /dev/null; then
+        CAN_CREATE_JOBS=true
+    else
+        CAN_CREATE_JOBS=false
+        info "Limited permissions detected - some tests will be skipped"
+    fi
+
+    if kubectl auth can-i create pods -n "$BACKUP_NAMESPACE" &> /dev/null; then
+        CAN_CREATE_PODS=true
+    else
+        CAN_CREATE_PODS=false
+    fi
+
+    # Check exec permission on database pods
+    if kubectl auth can-i exec pods -n authentik &> /dev/null; then
+        CAN_EXEC_PODS=true
+    else
+        CAN_EXEC_PODS=false
+    fi
 }
 
 # Test 1: Verify backup CronJob exists and is configured correctly
@@ -215,6 +237,12 @@ test_database_connectivity() {
 test_backup_execution() {
     print_section "Backup Execution Tests"
 
+    # Check if we have permission to create jobs
+    if [[ "$CAN_CREATE_JOBS" != "true" ]]; then
+        skip "Insufficient permissions to create test backup job"
+        return
+    fi
+
     local test_job_name="homelab-backup-test-$(date +%s)"
 
     info "Creating test backup job: $test_job_name"
@@ -268,6 +296,12 @@ test_backup_execution() {
 # Test 5: Verify backup files exist (if NFS is accessible)
 test_backup_files() {
     print_section "Backup File Verification Tests"
+
+    # Check if we have permission to create pods
+    if [[ "$CAN_CREATE_PODS" != "true" ]]; then
+        skip "Insufficient permissions to create verification pod"
+        return
+    fi
 
     # Check if we can access NFS via a test pod
     local test_pod="backup-verify-$(date +%s)"
@@ -393,6 +427,12 @@ test_backup_retention() {
 # Test 7: Database restore dry-run test
 test_restore_dry_run() {
     print_section "Restore Dry-Run Tests"
+
+    # Check if we have permission to exec into pods
+    if [[ "$CAN_EXEC_PODS" != "true" ]]; then
+        skip "Insufficient permissions to exec into database pods"
+        return
+    fi
 
     info "Testing restore capability with dry-run..."
 
