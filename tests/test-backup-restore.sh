@@ -162,9 +162,10 @@ test_last_backup_status() {
         fail "No successful backup recorded in CronJob status"
     fi
 
-    # Check for recent failed jobs
+    # Check for recent failed jobs (not just incomplete - must have Failed=True condition)
     local failed_jobs
-    failed_jobs=$(kubectl get jobs -n "$BACKUP_NAMESPACE" -l "job-name" --field-selector=status.successful=0 -o name 2>/dev/null | grep "$BACKUP_CRONJOB" | wc -l)
+    failed_jobs=$(kubectl get jobs -n "$BACKUP_NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.conditions[?(@.type=="Failed")].status}{"\n"}{end}' 2>/dev/null | grep "$BACKUP_CRONJOB" | grep -c "True" 2>/dev/null || echo "0")
+    failed_jobs=$(echo "$failed_jobs" | tr -d '[:space:]')
 
     if [[ "$failed_jobs" -eq 0 ]]; then
         pass "No failed backup jobs found"
@@ -296,8 +297,8 @@ spec:
   volumes:
   - name: nfs-backup
     nfs:
-      server: 192.168.1.234
-      path: /volume/e8e70d24-82e0-45f1-8ef6-f8ca399ad2d6/.srv/.unifi-drive/Shared_Drive_Example/.data
+      server: nfs-proxy.nfs-proxy.svc.cluster.local
+      path: /k8s-backup
   restartPolicy: Never
   terminationGracePeriodSeconds: 5
 EOF
@@ -331,20 +332,22 @@ EOF
     pass "Backup verification pod started successfully"
 
     # Check for backup files
+    # CronJob writes to /backup/homelab-YYYYMMDD-HHMMSS/{db}-db.sql
     for db in "${BACKUP_DATABASES[@]}"; do
         local backup_count
-        backup_count=$(kubectl exec -n "$BACKUP_NAMESPACE" "$test_pod" -- sh -c "ls -1 /backup/${db}*.sql.gz 2>/dev/null | wc -l" 2>/dev/null || echo "0")
+        backup_count=$(kubectl exec -n "$BACKUP_NAMESPACE" "$test_pod" -- sh -c "find /backup -name '${db}-db.sql' -type f 2>/dev/null | wc -l" 2>/dev/null || echo "0")
 
         if [[ "$backup_count" -gt 0 ]]; then
             pass "Found $backup_count backup file(s) for '$db'"
 
-            # Check most recent backup size
+            # Check most recent backup size (find newest homelab-* directory)
             local latest_backup
-            latest_backup=$(kubectl exec -n "$BACKUP_NAMESPACE" "$test_pod" -- sh -c "ls -1t /backup/${db}*.sql.gz 2>/dev/null | head -1" 2>/dev/null)
+            latest_backup=$(kubectl exec -n "$BACKUP_NAMESPACE" "$test_pod" -- sh -c "ls -dt /backup/homelab-*/ 2>/dev/null | head -1" 2>/dev/null)
 
             if [[ -n "$latest_backup" ]]; then
+                local backup_file="${latest_backup}${db}-db.sql"
                 local backup_size
-                backup_size=$(kubectl exec -n "$BACKUP_NAMESPACE" "$test_pod" -- sh -c "ls -lh /backup/$latest_backup 2>/dev/null | awk '{print \$5}'" 2>/dev/null)
+                backup_size=$(kubectl exec -n "$BACKUP_NAMESPACE" "$test_pod" -- sh -c "ls -lh '${backup_file}' 2>/dev/null | awk '{print \$5}'" 2>/dev/null)
 
                 if [[ -n "$backup_size" ]] && [[ "$backup_size" != "0" ]]; then
                     pass "Latest '$db' backup has size: $backup_size"

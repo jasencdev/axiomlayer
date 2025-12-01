@@ -209,7 +209,7 @@ test_service_monitors() {
 
     # Get all ServiceMonitors
     local service_monitors
-    service_monitors=$(kubectl get servicemonitors -A -o name 2>/dev/null | wc -l)
+    service_monitors=$(kubectl get servicemonitors -A -o name 2>/dev/null | wc -l | tr -d '[:space:]')
 
     if [[ "$service_monitors" -gt 0 ]]; then
         pass "Found $service_monitors ServiceMonitor(s) in cluster"
