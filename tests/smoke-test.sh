@@ -797,7 +797,7 @@ else
 fi
 
 # Check CertificateRequests status
-PENDING_REQUESTS=$(kubectl get certificaterequests -A -o jsonpath='{range .items[?(@.status.conditions[0].status!="True")]}{.metadata.namespace}/{.metadata.name}{" "}{end}' 2>/dev/null)
+PENDING_REQUESTS=$(kubectl get certificaterequests -A -o jsonpath='{range .items[?(@.status.conditions[0].status!="True")]}{.metadata.namespace}/{.metadata.name}{" "}{end}' 2>/dev/null || true)
 
 if [ -z "$PENDING_REQUESTS" ] || [ "$PENDING_REQUESTS" = " " ]; then
     pass "No pending CertificateRequests"
@@ -806,7 +806,7 @@ else
 fi
 
 # Check for failed Orders
-FAILED_ORDERS=$(kubectl get orders -A -o jsonpath='{range .items[?(@.status.state=="invalid")]}{.metadata.namespace}/{.metadata.name}{" "}{end}' 2>/dev/null)
+FAILED_ORDERS=$(kubectl get orders -A -o jsonpath='{range .items[?(@.status.state=="invalid")]}{.metadata.namespace}/{.metadata.name}{" "}{end}' 2>/dev/null || true)
 
 if [ -z "$FAILED_ORDERS" ] || [ "$FAILED_ORDERS" = " " ]; then
     pass "No failed ACME Orders"
