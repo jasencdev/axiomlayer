@@ -7,6 +7,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Cancel in-progress runs when new commits are pushed
+# Prevents CI pileup from rapid Copilot suggestion commits
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   statuses: write
