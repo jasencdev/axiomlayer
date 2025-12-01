@@ -149,6 +149,11 @@ kind: Certificate
 metadata:
   name: myapp-tls
   namespace: myapp
+  labels:
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/component: tls
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
 spec:
   secretName: myapp-tls
   issuerRef:
