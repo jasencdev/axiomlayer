@@ -1,8 +1,9 @@
 #!/bin/bash
 # Check for plaintext Secret resources (should use SealedSecret)
+# Matches only lines containing exactly 'kind: Secret' (no additional text)
 
 set -euo pipefail
-if grep -rn "kind: Secret" --include="*.yaml" apps/ infrastructure/ 2>/dev/null | grep -v SealedSecret; then
+if grep -rn "^\s*kind:\s*Secret\s*$" --include="*.yaml" apps/ infrastructure/ 2>/dev/null; then
     echo "ERROR: Found plaintext Secret. Use SealedSecret instead."
     exit 1
 fi
