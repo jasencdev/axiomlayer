@@ -379,13 +379,11 @@ sync_to_rag() {
         while IFS= read -r file; do
             [[ -z "$file" ]] && continue
 
-            local filename
-            filename=$(basename "$file")
-
-            if [[ -n "${KB_FILES_BY_NAME[$filename]:-}" ]]; then
-                if delete_file "${KB_FILES_BY_NAME[$filename]}" "$filename"; then
+            # Check if deleted file exists in KB by path
+            if [[ -n "${KB_FILES_BY_PATH[$file]:-}" ]]; then
+                if delete_file "${KB_FILES_BY_PATH[$file]}" "$file"; then
                     deleted=$((deleted + 1))
-                    unset "KB_FILES_BY_NAME[$filename]"
+                    unset "KB_FILES_BY_PATH[$file]"
                 fi
             fi
         done < <(get_deleted_files "$last_commit")

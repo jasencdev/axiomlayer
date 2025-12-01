@@ -494,6 +494,8 @@ replicas: 2
 
 ## Git Workflow
 
+**IMPORTANT**: The `main` branch is protected and requires pull requests. You cannot push directly to `main`.
+
 ### Branch Naming
 
 - `feat/short-description` - New features
@@ -542,17 +544,43 @@ to outpost deployment.
 
 ### Pull Requests
 
-1. Create feature branch from `main`
-2. Make changes and test locally
-3. Push to GitHub
-4. Create PR with description:
+The `main` branch is protected - all changes must go through PRs:
+
+1. Create feature branch from `main`:
+   ```bash
+   git checkout main
+   git pull
+   git checkout -b feat/your-feature-name
+   ```
+
+2. Make changes and test locally:
+   ```bash
+   ./tests/validate-manifests.sh  # Validate kustomize
+   ./tests/smoke-test.sh          # Test infrastructure
+   ```
+
+3. Commit with conventional commit message:
+   ```bash
+   git add .
+   git commit -m "feat: your feature description"
+   ```
+
+4. Push to GitHub:
+   ```bash
+   git push -u origin feat/your-feature-name
+   ```
+
+5. Create PR with description:
    - What changed
    - Why it changed
    - How to test
    - Any breaking changes
-5. Wait for CI to pass
-6. Request review (if working in team)
-7. Merge to `main`
+
+6. Wait for CI to pass (validate-manifests, lint, security)
+
+7. Merge to `main` (via GitHub UI or `gh pr merge`)
+
+**Note**: Direct pushes to `main` will be rejected by repository rules.
 
 ## Code Review Checklist
 

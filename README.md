@@ -949,6 +949,7 @@ kubectl apply -k apps/argocd/applications
 
 ## Notes
 
+- **Main branch is protected**: All changes must go through pull requests. Direct pushes to `main` will be rejected. See `CONTRIBUTING.md` for workflow.
 - ArgoCD is excluded from self-management to prevent sync loops
 - Helm charts are installed manually but managed via ArgoCD Applications
 - TLS termination happens at Traefik; backend services run HTTP

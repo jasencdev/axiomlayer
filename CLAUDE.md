@@ -364,7 +364,17 @@ kubectl create job --from=cronjob/homelab-backup homelab-backup-test -n longhorn
 
 # Check Longhorn volumes
 kubectl get volumes -n longhorn-system
+
+# Git workflow (main branch is protected - requires PRs)
+git checkout -b feat/your-feature     # Create feature branch
+git add .                             # Stage changes
+git commit -m "feat: description"    # Commit with conventional message
+git push -u origin feat/your-feature # Push branch
+gh pr create --fill                   # Create PR (or use GitHub UI)
+gh pr merge                          # Merge after CI passes
 ```
+
+**Note**: Direct pushes to `main` are blocked. All changes must go through pull requests.
 
 ## Adding a New Service
 
