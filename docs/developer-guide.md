@@ -166,6 +166,7 @@ metadata:
   name: myapp
   namespace: myapp
   annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.middlewares: authentik-ak-outpost-forward-auth-outpost@kubernetescrd
 spec:
   ingressClassName: traefik
