@@ -1,1 +1,3 @@
 *.env
+.rag-sync-commit
+.outline-sync-commit

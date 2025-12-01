@@ -236,7 +236,7 @@ jobs:
             echo "OUTLINE_API_TOKEN not set; skipping Outline sync."
             exit 0
           fi
-          python3 scripts/outline_sync.py
+          ./scripts/sync-outline.sh
 
   rag-sync:
     name: RAG Sync
