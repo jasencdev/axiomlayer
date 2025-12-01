@@ -1,6 +1,6 @@
 #!/bin/bash
 # Check for plaintext Secret resources (should use SealedSecret)
-# Ignores references to Secret in ignoreDifferences blocks
+# Matches only lines containing exactly 'kind: Secret' (no additional text)
 
 set -euo pipefail
 if grep -rn "^\s*kind:\s*Secret\s*$" --include="*.yaml" apps/ infrastructure/ 2>/dev/null; then
