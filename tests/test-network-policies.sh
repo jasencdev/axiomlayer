@@ -75,6 +75,14 @@ check_prerequisites() {
     fi
 
     pass "kubectl available and cluster accessible"
+
+    # Check if we have write permissions (for tests that need create/exec)
+    if kubectl auth can-i create namespaces &> /dev/null; then
+        CAN_CREATE_RESOURCES=true
+    else
+        CAN_CREATE_RESOURCES=false
+        info "Limited permissions detected - network policy enforcement tests will be skipped"
+    fi
 }
 
 # Setup test namespace and resources
@@ -520,6 +528,15 @@ main() {
     print_header "Network Policy Enforcement Tests"
 
     check_prerequisites
+
+    # Check if we can run the full test suite (requires write permissions)
+    if [[ "$CAN_CREATE_RESOURCES" != "true" ]]; then
+        info "Skipping network policy enforcement tests (read-only RBAC)"
+        # Only run the policies exist test which is read-only
+        test_policies_exist
+        print_summary
+        return
+    fi
 
     # Setup test environment
     if ! setup_test_environment; then

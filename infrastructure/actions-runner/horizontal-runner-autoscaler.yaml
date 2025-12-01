@@ -1,0 +1,21 @@
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: HorizontalRunnerAutoscaler
+metadata:
+  name: homelab-runners-autoscaler
+  namespace: actions-runner
+  labels:
+    app.kubernetes.io/name: actions-runner
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  scaleTargetRef:
+    kind: RunnerDeployment
+    name: homelab-runners
+  minReplicas: 1
+  maxReplicas: 5
+  scaleDownDelaySecondsAfterScaleOut: 300
+  metrics:
+    - type: TotalNumberOfQueuedAndInProgressWorkflowRuns
+      repositoryNames:
+        - jasencdev/axiomlayer

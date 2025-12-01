@@ -6,6 +6,7 @@ resources:
   - rbac.yaml
   - sealed-secret.yaml
   - runner-deployment.yaml
+  - horizontal-runner-autoscaler.yaml
 labels:
   - pairs:
       app.kubernetes.io/managed-by: argocd
