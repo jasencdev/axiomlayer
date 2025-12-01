@@ -359,15 +359,32 @@ kind: Cluster
 metadata:
   name: myapp-db
   namespace: myapp
+  labels:
+    app.kubernetes.io/name: myapp-db
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
 spec:
   instances: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
   storage:
     size: 5Gi
     storageClass: longhorn
+
   bootstrap:
     initdb:
       database: myapp
       owner: myapp
+
+  monitoring:
+    enablePodMonitor: true
 ```
 
 Connection string available at:
