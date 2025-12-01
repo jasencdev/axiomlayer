@@ -8,6 +8,28 @@ GitOps-managed K3s homelab with ArgoCD, SSO, TLS, observability, and automated b
 - **Cluster**: 4-node K3s over Tailscale mesh (2 control-plane, 2 workers)
 - **Repository**: https://github.com/jasencdev/axiomlayer
 - **K3s Version**: v1.33.6+k3s1
+- **Shell**: zsh 5.9 (Ubuntu default on this workstation)
+
+## Shell Compatibility
+
+**CRITICAL**: The operator workstation uses **zsh 5.9** (not bash). All commands and scripts MUST be zsh-compatible.
+
+### Requirements
+
+- **Interactive commands**: All commands in documentation must work in zsh
+- **Scripts**: All `.sh` scripts use `#!/bin/bash` shebang for portability (they run in bash mode)
+- **Environment sourcing**: The `.env` file uses bash-style `export VAR=value` syntax
+  - In zsh, source with: `source <(grep -v '^#' .env | sed 's/^/export /')`
+  - Or wrap commands: `bash -c 'source .env && ./scripts/sync-rag.sh'`
+- **Testing**: Test all commands in zsh before documenting
+- **Contributions**: All new scripts/docs must be zsh-compatible
+
+### Common zsh Gotchas
+
+- **Arrays**: zsh arrays are 1-indexed (bash is 0-indexed)
+- **Globbing**: zsh has extended glob by default
+- **String splitting**: `$var` doesn't split on whitespace in zsh (use `$=var` or quote properly)
+- **Conditionals**: `[[ ]]` works same as bash, but `[ ]` has subtle differences
 
 ## Nodes
 
@@ -101,6 +123,7 @@ CloudNativePG manages PostgreSQL instances:
 |----------|-----------|---------|-----------|
 | authentik-db | authentik | authentik-db-rw.authentik.svc:5432 | Yes |
 | outline-db | outline | outline-db-rw.outline.svc:5432 | Yes |
+| grafana-db | monitoring | grafana-db-rw.monitoring.svc:5432 | No |
 | n8n-db | n8n | n8n-db-rw.n8n.svc:5432 | No |
 | open-webui-db | open-webui | open-webui-db-rw.open-webui.svc:5432 | No |
 | postgres | default | postgres-rw.default.svc:5432 | No |
@@ -135,6 +158,26 @@ kubectl logs -n longhorn-system -l job-name=homelab-backup-test
 | Secret | Purpose |
 |--------|---------|
 | ARGOCD_AUTH_TOKEN | ArgoCD API access for sync trigger |
+| OUTLINE_API_TOKEN | Outline wiki sync |
+| OPEN_WEBUI_API_KEY | Open WebUI RAG sync |
+| OPEN_WEBUI_KNOWLEDGE_ID | RAG knowledge base ID |
+
+### Documentation Sync
+
+CI automatically syncs documentation on push to main:
+
+**Outline Sync** (`scripts/sync-outline.sh`):
+- Syncs markdown docs to Outline wiki at docs.lab.axiomlayer.com
+- Config: `outline_sync/config.json` defines which files to sync
+- State: `outline_sync/state.json` tracks document IDs
+- Marker: `.outline-sync-commit` tracks last synced commit
+
+**RAG Sync** (`scripts/sync-rag.sh`):
+- Syncs repo files to Open WebUI knowledge base for AI chat
+- Patterns: `*.md`, `apps/**/*.yaml`, `infrastructure/**/*.yaml`, `.github/workflows/*.yaml`
+- Excludes: `*sealed-secret*`, `*.env*`, `*AGENTS.md*`
+- Marker: `.rag-sync-commit` tracks last synced commit
+- Logic: if file not in KB → upload; if file in KB and changed → update; else skip
 
 ### Running Tests Locally
 ```bash
@@ -279,7 +322,9 @@ The `.env` file stores secrets for re-sealing. Never commit this file.
 | GHCR_DOCKERCONFIGJSON | GitHub Container Registry pull secret |
 | K3_JOIN_SERVER | K3s cluster join token |
 | PLANE_API_KEY | Plane API access |
-| OUTLINE_API_KEY | Outline API access |
+| OUTLINE_API_KEY | Outline API access (also accepted as OUTLINE_API_TOKEN) |
+| OPEN_WEBUI_API_KEY | Open WebUI API access |
+| OPEN_WEBUI_KNOWLEDGE_ID | RAG knowledge base ID |
 
 ## Key Commands
 

@@ -7,6 +7,16 @@ This is a GitOps-managed K3s homelab cluster repository. Changes are automatical
 - **Domain**: `*.lab.axiomlayer.com`
 - **Cluster**: 4-node K3s over Tailscale mesh (2 control-plane, 2 workers)
 - **K3s Version**: v1.33.6+k3s1
+- **Shell**: zsh 5.9 (all commands must be zsh-compatible)
+
+## Shell Compatibility
+
+**CRITICAL**: The operator workstation uses **zsh 5.9** (not bash). All commands and suggestions must be zsh-compatible.
+
+- Interactive commands must work in zsh
+- Shell scripts use `#!/bin/bash` shebang for portability
+- Test all commands in zsh before suggesting
+- Refer to `CLAUDE.md` and `CONTRIBUTING.md` for full guidelines
 
 ## Repository Structure
 

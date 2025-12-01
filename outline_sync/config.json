@@ -7,6 +7,10 @@
       "title": "Home"
     },
     {
+      "path": "CONTRIBUTING.md",
+      "title": "Contributing Guidelines"
+    },
+    {
       "path": "docs/ARCHITECTURE.md",
       "title": "Architecture Overview"
     },
@@ -37,6 +41,26 @@
     {
       "path": "docs/OUTLINE_SYNC_PLAN.md",
       "title": "Outline Sync"
+    },
+    {
+      "path": "docs/REPOSITORY_INVENTORY.md",
+      "title": "Repository Inventory & Audit"
+    },
+    {
+      "path": "docs/CI_CD_PIPELINE.md",
+      "title": "CI/CD Pipeline"
+    },
+    {
+      "path": "docs/DOCUMENTATION_AUDIT_REPORT.md",
+      "title": "Documentation Audit Report"
+    },
+    {
+      "path": "scripts/README.md",
+      "title": "Scripts Documentation"
+    },
+    {
+      "path": "tests/README.md",
+      "title": "Test Suite Documentation"
     }
   ]
 }

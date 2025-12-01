@@ -6,6 +6,9 @@ GitOps-managed K3s homelab with ArgoCD, SSO, TLS, and observability.
 - **Cluster**: 4-node K3s v1.33.6 over Tailscale mesh (2 control-plane, 2 workers)
 - **CI/CD**: Self-hosted GitHub Actions runners (`jasencdev` org)
 - **Repository**: `jasencdev/axiomlayer`
+- **Shell**: zsh 5.9 (all commands are zsh-compatible)
+
+> **⚠️ Shell Compatibility**: This project requires **zsh**. All documentation commands are tested with zsh 5.9. Scripts use `#!/bin/bash` shebangs and are portable, but interactive commands assume zsh. See `CLAUDE.md` for details.
 
 ---
 
@@ -137,12 +140,23 @@ axiomlayer/
 └── tests/test-auth.sh                     # Authentik ingress smoke test
 ```
 
-### Syncing Docs to Outline
+### Documentation Sync
 
+The CI pipeline automatically syncs documentation to two destinations on push to main:
+
+**Outline Wiki Sync** (`scripts/sync-outline.sh`):
 1. Set `OUTLINE_API_TOKEN` (create one in Outline with `documents.write` + `collections.write` scopes).
-2. Adjust `outline_sync/config.json` if you add/remove local docs.
-3. Run `python3 scripts/outline_sync.py` to create/update the Outline collection defined in the config. The script records collection + document IDs in `outline_sync/state.json` so future runs update in place.
-4. Add the same token as the GitHub secret `OUTLINE_API_TOKEN` so the `outline-sync` job in `.github/workflows/ci.yaml` can publish docs automatically on every push to `main`.
+2. Adjust `outline_sync/config.json` to add/remove docs and set titles.
+3. Run `./scripts/sync-outline.sh` to sync docs to the Outline collection.
+4. State tracked in `outline_sync/state.json` (document IDs) and `.outline-sync-commit` (last sync point).
+
+**Open WebUI RAG Sync** (`scripts/sync-rag.sh`):
+1. Set `OPEN_WEBUI_API_KEY` and `OPEN_WEBUI_KNOWLEDGE_ID` environment variables.
+2. Syncs `*.md`, `apps/**/*.yaml`, `infrastructure/**/*.yaml`, `.github/workflows/*.yaml`.
+3. Uses git history for incremental sync - only uploads new/changed files.
+4. State tracked in `.rag-sync-commit` (last sync point).
+
+Both scripts accept `FORCE_FULL_SYNC=true` to re-sync all files regardless of change detection.
 
 See `docs/OUTLINE_SYNC_PLAN.md` for the publishing hierarchy and API workflow.
 

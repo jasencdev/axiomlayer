@@ -67,8 +67,9 @@ Comprehensive documentation for networking configuration in the homelab cluster.
 |------|--------------|----------|------|
 | neko | 100.67.134.110 | 192.168.1.167 | K3s control-plane |
 | neko2 | 100.106.35.14 | 192.168.1.103 | K3s control-plane |
-| bobcat | 100.121.67.60 | 192.168.1.49 | K3s agent |
-| siberian | (Tailscale) | 192.168.1.x | GPU workstation |
+| panther | 100.79.124.94 | 192.168.1.x | K3s agent (primary worker, RTX 3050 Ti for embeddings) |
+| bobcat | 100.121.67.60 | 192.168.1.49 | K3s agent (Raspberry Pi 5) |
+| siberian | 100.115.3.88 | 192.168.1.x | GPU workstation (Ollama generation, RTX 5070 Ti) |
 | UniFi NAS | N/A | 192.168.1.234 | Backup storage |
 
 ### Kubernetes Network CIDRs
