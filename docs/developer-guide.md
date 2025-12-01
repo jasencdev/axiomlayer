@@ -434,6 +434,7 @@ env:
 
 Or use `latest` tag and restart:
 
+> **Note:** Using `kubectl rollout restart` requires direct cluster access and bypasses the GitOps workflow. This approach is not aligned with the platform's philosophy ("No kubectl. No SSH. No manual deploys. Just git push and watch it ride."). The recommended GitOps-friendly method is to update the image tag in your manifest and push the change, letting ArgoCD handle the rollout.
 ```bash
 kubectl rollout restart deployment/myapp -n myapp
 ```
