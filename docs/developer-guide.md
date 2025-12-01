@@ -29,9 +29,13 @@ CMD ["node", "server.js"]
 Build and push to GitHub Container Registry:
 
 ```bash
-docker build -t ghcr.io/jasencdev/myapp:latest .
-docker push ghcr.io/jasencdev/myapp:latest
+# Use semantic versioning or git commit SHA for image tags
+VERSION=$(git rev-parse --short HEAD)
+docker build -t ghcr.io/jasencdev/myapp:${VERSION} .
+docker push ghcr.io/jasencdev/myapp:${VERSION}
 ```
+
+> **Best Practice:** Always use immutable, versioned tags (semantic versions like `v1.0.0` or commit SHAs) instead of `latest`. This enables proper rollbacks through git history and makes it clear which version is running in the cluster.
 
 ### 2. Create the Manifests
 
@@ -469,12 +473,14 @@ env:
 
 ## Updating Your App
 
-1. Build new container version
-2. Push to registry with new tag
-3. Update image tag in deployment.yaml
-4. Commit and push
-5. ArgoCD syncs the change
-6. Rolling update, zero downtime
+The GitOps workflow for updates:
+
+1. Build new container version with a new tag
+2. Push to registry with the versioned tag
+3. Update image tag in `deployment.yaml`
+4. Commit and push to git
+5. ArgoCD detects the change and syncs
+6. Rolling update with zero downtime
 
 
 ---
@@ -482,6 +488,14 @@ env:
 ## Break Glass: Emergency Operations
 
 > **Warning:** The following is **not** the recommended workflow and should only be used in exceptional circumstances. Using `kubectl rollout restart` requires direct cluster access and bypasses the GitOps workflow. This approach is not aligned with the platform's philosophy ("No kubectl. No SSH. No manual deploys. Just git push and watch it deploy."). The recommended GitOps-friendly method is to update the image tag in your manifest and push the change, letting ArgoCD handle the rollout.
+
+ArgoCD automatically detects the change and performs a rolling update.
+
+> **Why versioned tags matter:**
+> - **Traceability**: Git history shows exactly which version was deployed and when
+> - **Rollback**: Revert to any previous version by reverting the git commit
+> - **Reproducibility**: Any commit represents an exact, reproducible state of the cluster
+> - **Auditability**: Clear record of who deployed what and when
 
 ---
 
