@@ -90,7 +90,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: myapp
-          image: ghcr.io/jasencdev/myapp:latest
+          image: ghcr.io/jasencdev/myapp@sha256:a1b2c3d4e5f67890...  # Pin to digest (64 hex chars)
           ports:
             - containerPort: 3000
           securityContext:
@@ -117,6 +117,8 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
 ```
+
+> **Note:** Pin container images to SHA256 digests (e.g., `@sha256:a1b2c3d4e5f67890...`) rather than mutable tags like `:latest` for reproducible deployments. Get the digest after pushing: `docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/jasencdev/myapp:v1.0.0`
 
 **service.yaml**
 ```yaml
