@@ -186,6 +186,11 @@ kind: NetworkPolicy
 metadata:
   name: myapp-default-deny
   namespace: myapp
+  labels:
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
 spec:
   podSelector: {}
   policyTypes:
@@ -197,6 +202,11 @@ kind: NetworkPolicy
 metadata:
   name: myapp-allow-ingress
   namespace: myapp
+  labels:
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
 spec:
   podSelector:
     matchLabels:
@@ -217,6 +227,11 @@ kind: NetworkPolicy
 metadata:
   name: myapp-allow-egress
   namespace: myapp
+  labels:
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
 spec:
   podSelector:
     matchLabels:
