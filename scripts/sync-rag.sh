@@ -25,13 +25,18 @@ REPO_ROOT="${REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 SYNC_MARKER_FILE="$REPO_ROOT/.rag-sync-commit"
 export KUBECONFIG="${KUBECONFIG:-/home/jasen/.kube/config}"
 
-# Known files that fail due to Open WebUI embedding bugs
-# These are tracked and logged but don't cause CI failure
-KNOWN_FAILING_FILES=(
+# Files to skip entirely (Open WebUI embedding bugs cause "duplicate content" errors)
+# These files are NOT synced to the KB - they will be added manually or investigated later
+SKIP_FILES=(
     "README.md"
     "docs/RAG_KNOWLEDGE_BASE.md"
     "infrastructure/alertmanager/ingress.yaml"
     "apps/dashboard/configmap.yaml"
+    ".kube-linter.yaml"
+    ".pre-commit-config.yaml"
+    ".yamllint.yaml"
+    "CLAUDE.md"
+    "CONTRIBUTING.md"
 )
 
 # Colors
@@ -44,11 +49,11 @@ log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# Check if a file is in the known-failing list
-is_known_failing() {
+# Check if a file should be skipped entirely
+should_skip() {
     local file="$1"
-    for known in "${KNOWN_FAILING_FILES[@]}"; do
-        if [[ "$file" == "$known" ]]; then
+    for skip in "${SKIP_FILES[@]}"; do
+        if [[ "$file" == "$skip" ]]; then
             return 0
         fi
     done
@@ -290,36 +295,6 @@ load_kb_files() {
     fi
 }
 
-# One-time migration: clean up old-style files (basename only, no __)
-# These files were created before path-safe naming was implemented
-cleanup_legacy_files() {
-    local legacy_count=0
-    local legacy_deleted=0
-
-    log_info "Checking for legacy files (basename-only naming)..."
-
-    for name in "${!KB_FILES[@]}"; do
-        # Legacy files don't contain __ (our path separator)
-        # Skip files that already use path-safe naming
-        if [[ "$name" != *"__"* ]]; then
-            legacy_count=$((legacy_count + 1))
-            local file_id="${KB_FILES[$name]}"
-            log_info "  Removing legacy file: $name (${file_id:0:8}...)"
-            if delete_file "$file_id" "$name"; then
-                legacy_deleted=$((legacy_deleted + 1))
-                unset "KB_FILES[$name]"
-            fi
-        fi
-    done
-
-    if [[ $legacy_count -gt 0 ]]; then
-        log_info "  Legacy cleanup: $legacy_deleted/$legacy_count files removed"
-        # Refresh KB file count after cleanup
-        KB_FILE_COUNT=$((KB_FILE_COUNT - legacy_deleted))
-    else
-        log_info "  No legacy files found (already migrated)"
-    fi
-}
 
 # Main sync function
 sync_to_rag() {
@@ -342,9 +317,6 @@ sync_to_rag() {
 
     # Load existing KB state
     load_kb_files
-
-    # One-time migration: clean up old basename-only files
-    cleanup_legacy_files
     echo ""
 
     # Get last sync point
@@ -391,6 +363,13 @@ sync_to_rag() {
 
         # Check exclusions
         if is_excluded "$file"; then
+            continue
+        fi
+
+        # Check if file should be skipped (known embedding issues)
+        if should_skip "$file"; then
+            log_warn "Skipping (known issue): $file"
+            skipped=$((skipped + 1))
             continue
         fi
 
@@ -461,30 +440,20 @@ sync_to_rag() {
     log_info "  Uploaded:       $uploaded"
     log_info "  Already synced: $already_synced"
     log_info "  Deleted:        $deleted"
-    log_info "  Skipped (size): $skipped"
+    log_info "  Skipped:        $skipped"
     log_info "  Failed:         $failed"
 
-    # Check for unexpected failures
-    local unexpected_failures=0
-    for file in "${FAILED_FILES[@]}"; do
-        if ! is_known_failing "$file"; then
-            log_error "Unexpected failure: $file"
-            unexpected_failures=$((unexpected_failures + 1))
-        else
-            log_warn "Known failing file (Open WebUI bug): $file"
-        fi
-    done
-
-    if [[ $unexpected_failures -gt 0 ]]; then
-        log_error "Sync failed with $unexpected_failures unexpected failures"
+    # Any failure is an error (skipped files are handled earlier)
+    if [[ $failed -gt 0 ]]; then
+        log_error "Sync failed with $failed failures:"
+        for file in "${FAILED_FILES[@]}"; do
+            log_error "  - $file"
+        done
         exit 1
     fi
 
-    # Save marker even if only known files failed
     save_sync_commit
-    if [[ ${#FAILED_FILES[@]} -gt 0 ]]; then
-        log_info "Sync completed (${#FAILED_FILES[@]} known failures tolerated)"
-    fi
+    log_info "Sync completed successfully"
 }
 
 # Run

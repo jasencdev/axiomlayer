@@ -95,7 +95,8 @@ while IFS= read -r file_entry; do
 
         # Delete the orphaned file
         DEL_RESP=$(api_call DELETE "/api/v1/files/$FILE_ID")
-        if echo "$DEL_RESP" | jq -e '.id' > /dev/null 2>&1; then
+        if echo "$DEL_RESP" | jq -e '.id' > /dev/null 2>&1 || \
+           echo "$DEL_RESP" | jq -e '.message == "File deleted successfully"' > /dev/null 2>&1; then
             ORPHANED_DELETED=$((ORPHANED_DELETED + 1))
             log_info "    ✓ Deleted"
         else
@@ -129,7 +130,8 @@ while IFS= read -r file_entry; do
 
     log_info "  Deleting from KB: $FILE_NAME"
     DEL_RESP=$(api_call DELETE "/api/v1/files/$FILE_ID")
-    if echo "$DEL_RESP" | jq -e '.id' > /dev/null 2>&1; then
+    if echo "$DEL_RESP" | jq -e '.id' > /dev/null 2>&1 || \
+       echo "$DEL_RESP" | jq -e '.message == "File deleted successfully"' > /dev/null 2>&1; then
         KB_DELETED=$((KB_DELETED + 1))
     else
         log_warn "    Failed: $DEL_RESP"
