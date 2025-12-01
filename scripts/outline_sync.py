@@ -109,6 +109,43 @@ def sync_document(
     return doc_id
 
 
+def path_to_title(path: str) -> str:
+    """Convert a file path to a document title."""
+    name = Path(path).stem
+    # Handle common naming patterns
+    name = name.replace("-", " ").replace("_", " ")
+    # Title case, but preserve uppercase acronyms
+    words = name.split()
+    titled = []
+    for word in words:
+        if word.isupper():
+            titled.append(word)
+        else:
+            titled.append(word.title())
+    return " ".join(titled)
+
+
+def discover_docs(config: Dict[str, Any]) -> list:
+    """Auto-discover markdown files in docs/ and merge with config."""
+    # Start with explicit config entries
+    explicit = {e["path"]: e for e in config.get("documents", [])}
+
+    # Auto-discover docs/*.md files
+    docs_dir = ROOT / "docs"
+    if docs_dir.exists():
+        for md_file in sorted(docs_dir.glob("*.md")):
+            rel_path = str(md_file.relative_to(ROOT))
+            if rel_path not in explicit:
+                explicit[rel_path] = {
+                    "path": rel_path,
+                    "title": path_to_title(rel_path),
+                }
+
+    # Also include README.md if configured
+
+    return list(explicit.values())
+
+
 def main() -> None:
     if not CONFIG_PATH.exists():
         raise SystemExit(f"Missing config file at {CONFIG_PATH}")
@@ -119,7 +156,10 @@ def main() -> None:
 
     collection_id = ensure_collection(api_url, token, config, state)
 
-    for entry in config["documents"]:
+    # Auto-discover docs and merge with config
+    documents = discover_docs(config)
+
+    for entry in documents:
         rel_path = entry["path"]
         file_path = ROOT / rel_path
         if not file_path.exists():
