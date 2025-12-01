@@ -165,7 +165,13 @@ kind: Ingress
 metadata:
   name: myapp
   namespace: myapp
+  labels:
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
   annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.middlewares: authentik-ak-outpost-forward-auth-outpost@kubernetescrd
 spec:
   ingressClassName: traefik
