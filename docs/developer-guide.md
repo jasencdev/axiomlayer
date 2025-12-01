@@ -129,12 +129,18 @@ metadata:
   namespace: myapp
   labels:
     app.kubernetes.io/name: myapp
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
 spec:
+  type: ClusterIP
   selector:
     app.kubernetes.io/name: myapp
   ports:
     - port: 80
       targetPort: 3000
+      protocol: TCP
+      name: http
 ```
 
 **certificate.yaml**
