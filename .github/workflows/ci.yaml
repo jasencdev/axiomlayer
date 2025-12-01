@@ -18,23 +18,10 @@ permissions:
   statuses: write
 
 jobs:
-  # Wait for Codex to review PRs before running CI (only on initial PR creation)
-  codex-review-delay:
-    name: Wait for Codex Review
-    runs-on: [self-hosted, homelab]
-    if: github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'reopened')
-    steps:
-      - name: Wait 2 minutes for Codex review
-        run: |
-          echo "Waiting 2 minutes to allow Codex to review the PR..."
-          sleep 120
-          echo "Proceeding with CI"
-
   validate-manifests:
     name: Validate Manifests
     runs-on: [self-hosted, homelab]
-    needs: [codex-review-delay]
-    if: always() && (needs.codex-review-delay.result == 'success' || needs.codex-review-delay.result == 'skipped')
+    if: github.event_name == 'pull_request'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -60,6 +47,7 @@ jobs:
   lint:
     name: Kubernetes Linting
     runs-on: [self-hosted, homelab]
+    if: github.event_name == 'pull_request'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -89,6 +77,7 @@ jobs:
   security:
     name: Security Scanning
     runs-on: [self-hosted, homelab]
+    if: github.event_name == 'pull_request'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -124,16 +113,22 @@ jobs:
     steps:
       - name: Check CI results
         run: |
-          if [ "${{ needs.validate-manifests.result }}" != "success" ]; then
-            echo "Manifest validation failed"
-            exit 1
+          # On PRs, validate-manifests and security must pass
+          # On main push, these jobs are skipped (already validated in PR)
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            if [ "${{ needs.validate-manifests.result }}" != "success" ]; then
+              echo "Manifest validation failed"
+              exit 1
+            fi
+            if [ "${{ needs.security.result }}" != "success" ]; then
+              echo "Security scan failed"
+              exit 1
+            fi
+            # Lint is informational only
+            echo "All required CI checks passed"
+          else
+            echo "Main push - validation already done in PR"
           fi
-          if [ "${{ needs.security.result }}" != "success" ]; then
-            echo "Security scan failed"
-            exit 1
-          fi
-          # Lint is informational only
-          echo "All required CI checks passed"
 
       - name: Trigger ArgoCD sync
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
