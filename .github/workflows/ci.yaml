@@ -158,7 +158,7 @@ jobs:
     name: Integration Tests
     runs-on: [self-hosted, homelab]
     needs: [ci-passed]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: always() && needs.ci-passed.result == 'success' && github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -200,7 +200,7 @@ jobs:
     name: Extended Tests
     runs-on: [self-hosted, homelab]
     needs: [ci-passed]
-    if: (github.ref == 'refs/heads/main' && github.event_name == 'push') || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    if: always() && needs.ci-passed.result == 'success' && ((github.ref == 'refs/heads/main' && github.event_name == 'push') || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -233,7 +233,7 @@ jobs:
     name: Outline Sync
     runs-on: [self-hosted, homelab]
     needs: [ci-passed]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: always() && needs.ci-passed.result == 'success' && github.ref == 'refs/heads/main' && github.event_name == 'push'
     env:
       OUTLINE_API_TOKEN: ${{ secrets.OUTLINE_API_TOKEN }}
     steps:
@@ -252,7 +252,7 @@ jobs:
     name: RAG Sync
     runs-on: [self-hosted, homelab]
     needs: [ci-passed]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: always() && needs.ci-passed.result == 'success' && github.ref == 'refs/heads/main' && github.event_name == 'push'
     env:
       OPEN_WEBUI_URL: https://ai.lab.axiomlayer.com
       OPEN_WEBUI_API_KEY: ${{ secrets.OPEN_WEBUI_API_KEY }}
