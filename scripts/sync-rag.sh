@@ -54,6 +54,13 @@ is_known_failing() {
     return 1
 }
 
+# Convert path to safe filename (replace / with __)
+# Open WebUI strips directory paths from filenames, so we encode the path
+# Example: apps/dashboard/configmap.yaml -> apps__dashboard__configmap.yaml
+path_to_safe_name() {
+    echo "$1" | sed 's|/|__|g'
+}
+
 # Parse command line arguments
 for arg in "$@"; do
     case $arg in
@@ -204,9 +211,10 @@ upload_file() {
     kubectl cp "$file_path" "open-webui/$POD:/tmp/sync-file" 2>/dev/null
 
     # Upload and add to KB inside the pod (pipe through bash for proper JWT handling)
+    # Use safe_name (with __ instead of /) to preserve path info since Open WebUI strips paths
     local result
     result=$(cat <<UPLOAD_SCRIPT | kubectl exec -i -n open-webui "$POD" -- bash
-RESP=\$(curl -s -X POST -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' -F 'file=@/tmp/sync-file;filename=$safe_name' http://localhost:8080/api/v1/files/)
+RESP=\$(curl -s -X POST -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' -F "file=@/tmp/sync-file;filename=$safe_name" http://localhost:8080/api/v1/files/)
 FID=\$(echo "\$RESP" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("id",""))' 2>/dev/null)
 if [ -n "\$FID" ] && [ "\$FID" != "None" ]; then
     ADD_RESP=\$(curl -s -X POST -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' -H 'Content-Type: application/json' -d "{\"file_id\":\"\$FID\"}" 'http://localhost:8080/api/v1/knowledge/$OPEN_WEBUI_KNOWLEDGE_ID/file/add')
@@ -226,15 +234,15 @@ UPLOAD_SCRIPT
 
     case "$result" in
         OK*)
-            log_info "  ✓ Added to knowledge base: $relative_path"
+            log_info "  ✓ Added to knowledge base: $safe_name"
             return 0
             ;;
         FAIL_KB*)
-            log_error "  ✗ KB add failed (cleaned up): $relative_path"
+            log_error "  ✗ KB add failed (cleaned up): $safe_name"
             return 1
             ;;
         *)
-            log_error "  ✗ Upload failed: $relative_path"
+            log_error "  ✗ Upload failed: $safe_name"
             return 1
             ;;
     esac
@@ -363,10 +371,12 @@ sync_to_rag() {
         log_info "Checking for deleted files..."
         while IFS= read -r file; do
             [[ -z "$file" ]] && continue
-            if [[ -n "${KB_FILES[$file]:-}" ]]; then
-                if delete_file "${KB_FILES[$file]}" "$file"; then
+            local safe_name
+            safe_name=$(path_to_safe_name "$file")
+            if [[ -n "${KB_FILES[$safe_name]:-}" ]]; then
+                if delete_file "${KB_FILES[$safe_name]}" "$safe_name"; then
                     deleted=$((deleted + 1))
-                    unset "KB_FILES[$file]"
+                    unset "KB_FILES[$safe_name]"
                 fi
             fi
         done < <(get_deleted_files "$last_commit")
@@ -402,9 +412,11 @@ sync_to_rag() {
             continue
         fi
 
-        # Decision logic - look up by safe name (path with / replaced by __)
+        # Convert to safe name for KB lookup (/ -> __)
         local safe_name
         safe_name=$(path_to_safe_name "$file")
+
+        # Decision logic - lookup using safe name since that's how files are stored in KB
         local file_in_kb=false
         if [[ -n "${KB_FILES[$safe_name]:-}" ]]; then
             file_in_kb=true
