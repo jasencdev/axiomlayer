@@ -244,7 +244,8 @@ jobs:
     needs: [ci-passed]
     if: always() && needs.ci-passed.result == 'success' && github.ref == 'refs/heads/main' && github.event_name == 'push'
     env:
-      OPEN_WEBUI_URL: https://ai.lab.axiomlayer.com
+      # Use internal cluster URL to bypass Authentik forward auth
+      OPEN_WEBUI_URL: http://open-webui.open-webui.svc.cluster.local:8080
       OPEN_WEBUI_API_KEY: ${{ secrets.OPEN_WEBUI_API_KEY }}
       OPEN_WEBUI_KNOWLEDGE_ID: ${{ secrets.OPEN_WEBUI_KNOWLEDGE_ID }}
     steps:

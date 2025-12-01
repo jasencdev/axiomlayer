@@ -12,7 +12,9 @@
 set -euo pipefail
 
 # Configuration
-OPEN_WEBUI_URL="${OPEN_WEBUI_URL:-https://ai.lab.axiomlayer.com}"
+# Use internal cluster URL by default to bypass forward auth
+# External URL can be used if API paths are excluded from auth
+OPEN_WEBUI_URL="${OPEN_WEBUI_URL:-http://open-webui.open-webui.svc.cluster.local:8080}"
 REPO_ROOT="${REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 
 # Files to sync (relative to repo root)
