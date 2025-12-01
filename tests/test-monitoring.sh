@@ -59,6 +59,9 @@ info() {
     echo -e "${BLUE}ℹ INFO${NC}: $1"
 }
 
+# Permission flags
+CAN_EXEC_PODS=false
+
 # Check prerequisites
 check_prerequisites() {
     print_section "Checking Prerequisites"
@@ -76,6 +79,13 @@ check_prerequisites() {
     if ! kubectl get namespace "$MONITORING_NAMESPACE" &> /dev/null; then
         fail "Monitoring namespace '$MONITORING_NAMESPACE' does not exist"
         exit 1
+    fi
+
+    # Check if we have exec permissions
+    if kubectl auth can-i create pods/exec -n "$MONITORING_NAMESPACE" &> /dev/null; then
+        CAN_EXEC_PODS=true
+    else
+        info "Limited permissions detected - tests requiring kubectl exec will be skipped"
     fi
 
     pass "Prerequisites met"
@@ -143,6 +153,12 @@ test_prometheus_health() {
 # Test 2: Prometheus Scrape Targets
 test_prometheus_targets() {
     print_section "Prometheus Scrape Target Tests"
+
+    # Skip if we don't have exec permissions
+    if [[ "$CAN_EXEC_PODS" != "true" ]]; then
+        skip "Prometheus targets test requires kubectl exec permissions"
+        return
+    fi
 
     # Get Prometheus pod for port-forward
     local prometheus_pod
@@ -250,16 +266,18 @@ test_grafana_datasources() {
     pass "Grafana pod is running"
     grafana_pod="${grafana_pod#pod/}"
 
-    # Check datasource configuration via API (using kubectl exec)
-    local datasources
-    datasources=$(kubectl exec -n "$MONITORING_NAMESPACE" "$grafana_pod" -- \
-        wget -q -O - "http://localhost:3000/api/datasources" \
-        --header="Authorization: Basic $(echo -n 'admin:admin' | base64)" 2>/dev/null || echo "[]")
+    # Check datasource configuration via API (using kubectl exec) if we have permissions
+    local datasources="[]"
+    if [[ "$CAN_EXEC_PODS" == "true" ]]; then
+        datasources=$(kubectl exec -n "$MONITORING_NAMESPACE" "$grafana_pod" -- \
+            wget -q -O - "http://localhost:3000/api/datasources" \
+            --header="Authorization: Basic $(echo -n 'admin:admin' | base64)" 2>/dev/null || echo "[]")
+    fi
 
     if echo "$datasources" | grep -q "Prometheus\|prometheus"; then
         pass "Prometheus datasource configured in Grafana"
     else
-        # Check via provisioned datasources
+        # Check via provisioned datasources (doesn't require exec)
         local provisioned_ds
         provisioned_ds=$(kubectl get configmaps -n "$MONITORING_NAMESPACE" -o name 2>/dev/null | grep -i "grafana.*datasource" | wc -l)
         if [[ "$provisioned_ds" -gt 0 ]]; then
@@ -312,21 +330,23 @@ test_alertmanager() {
         info "Could not find Alertmanager configuration secret"
     fi
 
-    # Check for active alerts via Alertmanager API
-    local alertmanager_pod
-    alertmanager_pod=$(kubectl get pods -n "$MONITORING_NAMESPACE" -l "app.kubernetes.io/name=alertmanager" -o name 2>/dev/null | head -1)
+    # Check for active alerts via Alertmanager API (requires exec permissions)
+    if [[ "$CAN_EXEC_PODS" == "true" ]]; then
+        local alertmanager_pod
+        alertmanager_pod=$(kubectl get pods -n "$MONITORING_NAMESPACE" -l "app.kubernetes.io/name=alertmanager" -o name 2>/dev/null | head -1)
 
-    if [[ -n "$alertmanager_pod" ]]; then
-        alertmanager_pod="${alertmanager_pod#pod/}"
+        if [[ -n "$alertmanager_pod" ]]; then
+            alertmanager_pod="${alertmanager_pod#pod/}"
 
-        local alerts
-        alerts=$(kubectl exec -n "$MONITORING_NAMESPACE" "$alertmanager_pod" -- \
-            wget -q -O - "http://localhost:9093/api/v2/alerts" 2>/dev/null || echo "[]")
+            local alerts
+            alerts=$(kubectl exec -n "$MONITORING_NAMESPACE" "$alertmanager_pod" -- \
+                wget -q -O - "http://localhost:9093/api/v2/alerts" 2>/dev/null || echo "[]")
 
-        local alert_count
-        alert_count=$(echo "$alerts" | grep -o '"fingerprint"' | wc -l)
+            local alert_count
+            alert_count=$(echo "$alerts" | grep -o '"fingerprint"' | wc -l)
 
-        info "Alertmanager currently has $alert_count active alert(s)"
+            info "Alertmanager currently has $alert_count active alert(s)"
+        fi
     fi
 }
 
@@ -413,6 +433,12 @@ test_loki() {
 # Test 8: Metrics Collection Verification
 test_metrics_collection() {
     print_section "Metrics Collection Verification Tests"
+
+    # Skip if we don't have exec permissions
+    if [[ "$CAN_EXEC_PODS" != "true" ]]; then
+        skip "Metrics collection test requires kubectl exec permissions"
+        return
+    fi
 
     # Get Prometheus pod
     local prometheus_pod
