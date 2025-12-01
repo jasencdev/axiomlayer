@@ -136,6 +136,7 @@ metadata:
     app.kubernetes.io/part-of: homelab
     app.kubernetes.io/managed-by: argocd
 spec:
+  type: ClusterIP
   selector:
     app.kubernetes.io/name: myapp
   ports:
@@ -151,6 +152,11 @@ kind: Certificate
 metadata:
   name: myapp-tls
   namespace: myapp
+  labels:
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/component: tls
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
 spec:
   secretName: myapp-tls
   issuerRef:
