@@ -364,7 +364,7 @@ Within 3 minutes:
 | Push to registry | — |
 | Create manifests | — |
 | Open PR | CI validates manifests |
-| Merge | ArgoCD detects change |
+| Merge | ArgoCD detects changes |
 | — | Syncs to cluster |
 | — | cert-manager issues TLS |
 | — | external-dns creates DNS |
