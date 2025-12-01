@@ -31,6 +31,7 @@ KNOWN_FAILING_FILES=(
     "README.md"
     "docs/RAG_KNOWLEDGE_BASE.md"
     "infrastructure/alertmanager/ingress.yaml"
+    "apps/dashboard/configmap.yaml"
 )
 
 # Colors
@@ -185,18 +186,15 @@ delete_file() {
     local response
     response=$(api_call DELETE "/api/v1/files/$file_id")
 
+    # Check for success - either .id in response or success message
     if echo "$response" | jq -e '.id' > /dev/null 2>&1; then
+        return 0
+    elif echo "$response" | jq -e '.message == "File deleted successfully"' > /dev/null 2>&1; then
         return 0
     else
         log_warn "  Delete may have failed: $response"
         return 1
     fi
-}
-
-# Convert path to safe filename (replace / with __)
-# e.g., apps/dashboard/configmap.yaml -> apps__dashboard__configmap.yaml
-path_to_safe_name() {
-    echo "$1" | sed 's|/|__|g'
 }
 
 # Upload a file and add to KB (using same method as manual script)
