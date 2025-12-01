@@ -69,8 +69,8 @@ kubectl apply -f /mnt/backup/100-full-backup/k8s/<namespace>/resources.yaml
 
 ```bash
 # Example: Restore Authentik database
-# First, find your actual PostgreSQL pod name:
-kubectl get pods -n authentik
+# Find your actual PostgreSQL pod name using a label selector (recommended):
+kubectl get pods -n authentik -l app=postgres
 # Then, replace <authentik-db-pod> below with the correct pod name:
 kubectl exec -i -n authentik <authentik-db-pod> -c postgres -- psql -U postgres -d authentik < /mnt/backup/100-full-backup/databases/authentik.sql
 ```
