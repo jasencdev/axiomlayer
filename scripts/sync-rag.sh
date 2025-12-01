@@ -96,21 +96,18 @@ get_pod() {
 }
 
 # Helper to call Open WebUI API from within the cluster
+# Uses bash -c to properly handle JWT tokens with special characters
 api_call() {
     local method="$1"
     local endpoint="$2"
     local data="${3:-}"
 
     if [[ -n "$data" ]]; then
-        kubectl exec -n open-webui "$POD" -- curl -s -X "$method" \
-            -H "Authorization: Bearer $OPEN_WEBUI_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d "$data" \
-            "http://localhost:8080$endpoint" 2>/dev/null
+        echo "curl -s -X '$method' -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' -H 'Content-Type: application/json' -d '$data' 'http://localhost:8080$endpoint'" | \
+            kubectl exec -i -n open-webui "$POD" -- bash
     else
-        kubectl exec -n open-webui "$POD" -- curl -s -X "$method" \
-            -H "Authorization: Bearer $OPEN_WEBUI_API_KEY" \
-            "http://localhost:8080$endpoint" 2>/dev/null
+        echo "curl -s -X '$method' -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' 'http://localhost:8080$endpoint'" | \
+            kubectl exec -i -n open-webui "$POD" -- bash
     fi
 }
 
@@ -171,6 +168,7 @@ delete_file() {
 }
 
 # Upload a file and add to KB (using same method as manual script)
+# Uses piped bash to properly handle JWT tokens with special characters
 upload_file() {
     local file_path="$1"
     local relative_path="${file_path#$REPO_ROOT/}"
@@ -178,25 +176,26 @@ upload_file() {
     # Copy file to pod
     kubectl cp "$file_path" "open-webui/$POD:/tmp/sync-file" 2>/dev/null
 
-    # Upload and add to KB inside the pod
+    # Upload and add to KB inside the pod (pipe through bash for proper JWT handling)
     local result
-    result=$(kubectl exec -n open-webui "$POD" -- sh -c "
-        RESP=\$(curl -s -X POST -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' -F 'file=@/tmp/sync-file;filename=$relative_path' http://localhost:8080/api/v1/files/)
-        FID=\$(echo \"\$RESP\" | python3 -c 'import sys,json;print(json.load(sys.stdin).get(\"id\",\"\"))' 2>/dev/null)
-        if [ -n \"\$FID\" ] && [ \"\$FID\" != \"None\" ]; then
-            ADD_RESP=\$(curl -s -X POST -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' -H 'Content-Type: application/json' -d \"{\\\"file_id\\\":\\\"\$FID\\\"}\" 'http://localhost:8080/api/v1/knowledge/$OPEN_WEBUI_KNOWLEDGE_ID/file/add')
-            if echo \"\$ADD_RESP\" | python3 -c 'import sys,json;d=json.load(sys.stdin);exit(0 if \"files\" in d else 1)' 2>/dev/null; then
-                echo 'OK'
-            else
-                # Failed to add to KB - delete the orphaned file
-                curl -s -X DELETE -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' \"http://localhost:8080/api/v1/files/\$FID\" >/dev/null 2>&1
-                echo 'FAIL_KB'
-            fi
-        else
-            echo 'FAIL_UPLOAD'
-        fi
-        rm -f /tmp/sync-file
-    " 2>/dev/null)
+    result=$(cat <<UPLOAD_SCRIPT | kubectl exec -i -n open-webui "$POD" -- bash
+RESP=\$(curl -s -X POST -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' -F 'file=@/tmp/sync-file;filename=$relative_path' http://localhost:8080/api/v1/files/)
+FID=\$(echo "\$RESP" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("id",""))' 2>/dev/null)
+if [ -n "\$FID" ] && [ "\$FID" != "None" ]; then
+    ADD_RESP=\$(curl -s -X POST -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' -H 'Content-Type: application/json' -d "{\"file_id\":\"\$FID\"}" 'http://localhost:8080/api/v1/knowledge/$OPEN_WEBUI_KNOWLEDGE_ID/file/add')
+    if echo "\$ADD_RESP" | python3 -c 'import sys,json;d=json.load(sys.stdin);exit(0 if "files" in d else 1)' 2>/dev/null; then
+        echo 'OK'
+    else
+        # Failed to add to KB - delete the orphaned file
+        curl -s -X DELETE -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' "http://localhost:8080/api/v1/files/\$FID" >/dev/null 2>&1
+        echo 'FAIL_KB'
+    fi
+else
+    echo 'FAIL_UPLOAD'
+fi
+rm -f /tmp/sync-file
+UPLOAD_SCRIPT
+)
 
     case "$result" in
         OK*)
