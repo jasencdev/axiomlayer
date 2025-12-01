@@ -173,11 +173,6 @@ jobs:
           fi
           kubectl version --client
 
-      - name: Wait for ArgoCD sync
-        run: |
-          echo "Waiting 60s for ArgoCD to sync changes..."
-          sleep 60
-
       - name: Run smoke tests
         run: ./tests/smoke-test.sh
 
