@@ -411,7 +411,7 @@ kubectl create secret generic myapp-secrets \
   --namespace myapp \
   --from-literal=API_KEY=supersecret \
   --dry-run=client -o yaml | \
-  kubeseal --format yaml > apps/myapp/sealed-secret.yaml
+  kubeseal --controller-name=sealed-secrets --controller-namespace=kube-system --format yaml > apps/myapp/sealed-secret.yaml
 ```
 
 Reference in deployment:
