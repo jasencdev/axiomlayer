@@ -165,6 +165,11 @@ kind: Ingress
 metadata:
   name: myapp
   namespace: myapp
+  labels:
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
   annotations:
     traefik.ingress.kubernetes.io/router.middlewares: authentik-ak-outpost-forward-auth-outpost@kubernetescrd
 spec:
