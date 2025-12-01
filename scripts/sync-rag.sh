@@ -25,6 +25,14 @@ REPO_ROOT="${REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 SYNC_MARKER_FILE="$REPO_ROOT/.rag-sync-commit"
 export KUBECONFIG="${KUBECONFIG:-/home/jasen/.kube/config}"
 
+# Known files that fail due to Open WebUI embedding bugs
+# These are tracked and logged but don't cause CI failure
+KNOWN_FAILING_FILES=(
+    "README.md"
+    "docs/RAG_KNOWLEDGE_BASE.md"
+    "infrastructure/alertmanager/ingress.yaml"
+)
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -34,6 +42,17 @@ NC='\033[0m'
 log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+
+# Check if a file is in the known-failing list
+is_known_failing() {
+    local file="$1"
+    for known in "${KNOWN_FAILING_FILES[@]}"; do
+        if [[ "$file" == "$known" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
 
 # Parse command line arguments
 for arg in "$@"; do
@@ -295,6 +314,7 @@ sync_to_rag() {
     local deleted=0
     local failed=0
     local already_synced=0
+    declare -a FAILED_FILES=()
 
     # Handle deleted files first
     if [[ -n "$last_commit" ]]; then
@@ -353,6 +373,7 @@ sync_to_rag() {
                 uploaded=$((uploaded + 1))
             else
                 failed=$((failed + 1))
+                FAILED_FILES+=("$file")
             fi
         elif [[ "${FORCE_FULL_SYNC:-}" == "true" ]]; then
             # Force sync - delete and re-upload
@@ -362,6 +383,7 @@ sync_to_rag() {
                 uploaded=$((uploaded + 1))
             else
                 failed=$((failed + 1))
+                FAILED_FILES+=("$file")
             fi
         elif file_changed_since "$file" "$last_commit"; then
             # File in KB but changed - delete old and upload new
@@ -371,6 +393,7 @@ sync_to_rag() {
                 uploaded=$((uploaded + 1))
             else
                 failed=$((failed + 1))
+                FAILED_FILES+=("$file")
             fi
         else
             # File in KB and not changed - skip
@@ -387,12 +410,26 @@ sync_to_rag() {
     log_info "  Skipped (size): $skipped"
     log_info "  Failed:         $failed"
 
-    # Save sync marker on success
-    if [[ $failed -eq 0 ]]; then
-        save_sync_commit
-    else
-        log_warn "Sync completed with errors - marker not updated"
+    # Check for unexpected failures
+    local unexpected_failures=0
+    for file in "${FAILED_FILES[@]}"; do
+        if ! is_known_failing "$file"; then
+            log_error "Unexpected failure: $file"
+            unexpected_failures=$((unexpected_failures + 1))
+        else
+            log_warn "Known failing file (Open WebUI bug): $file"
+        fi
+    done
+
+    if [[ $unexpected_failures -gt 0 ]]; then
+        log_error "Sync failed with $unexpected_failures unexpected failures"
         exit 1
+    fi
+
+    # Save marker even if only known files failed
+    save_sync_commit
+    if [[ ${#FAILED_FILES[@]} -gt 0 ]]; then
+        log_info "Sync completed (${#FAILED_FILES[@]} known failures tolerated)"
     fi
 }
 
