@@ -47,6 +47,10 @@ spec:
           volumeSize: 10Gi
           storageClass: longhorn
 
+        worker:
+          memoryLimit: 2000Mi
+          memoryRequest: 500Mi
+
         env:
           docstore_bucket: "uploads"
   destination:
