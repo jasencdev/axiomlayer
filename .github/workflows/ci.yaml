@@ -80,6 +80,81 @@ jobs:
       - name: Lint infrastructure
         run: kube-linter lint infrastructure/ --config .kube-linter.yaml || true
 
+  polaris:
+    name: Polaris Audit
+    runs-on: [self-hosted, homelab]
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install kubectl
+        run: |
+          if ! command -v kubectl &> /dev/null; then
+            ARCH=$(uname -m)
+            case $ARCH in
+              x86_64) ARCH="amd64" ;;
+              aarch64) ARCH="arm64" ;;
+              armv7l) ARCH="arm" ;;
+            esac
+            OS=$(uname -s)
+            case $OS in
+              Linux) OS="linux" ;;
+              Darwin) OS="darwin" ;;
+              *) echo "Unsupported OS: $OS"; exit 1 ;;
+            esac
+            curl -fsSLo kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/${OS}/${ARCH}/kubectl"
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin/
+          fi
+          kubectl version --client
+
+      - name: Install Polaris
+        run: |
+          if ! command -v polaris &> /dev/null; then
+            ARCH=$(uname -m)
+            case $ARCH in
+              x86_64) ARCH="amd64" ;;
+              aarch64) ARCH="arm64" ;;
+              *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+            esac
+            POLARIS_VERSION="9.6.1"
+            curl -sSL -o /tmp/polaris.tar.gz "https://github.com/FairwindsOps/polaris/releases/download/${POLARIS_VERSION}/polaris_linux_${ARCH}.tar.gz"
+            tar -xzf /tmp/polaris.tar.gz -C /tmp
+            sudo mv /tmp/polaris /usr/local/bin/
+            rm /tmp/polaris.tar.gz
+          fi
+          polaris version
+
+      - name: Build kustomize manifests
+        run: |
+          mkdir -p /tmp/rendered-manifests
+          for dir in apps/*/; do
+            app=$(basename "$dir")
+            if [ -f "${dir}kustomization.yaml" ]; then
+              kubectl kustomize "$dir" > "/tmp/rendered-manifests/${app}.yaml" 2>/dev/null || true
+            fi
+          done
+          for dir in infrastructure/*/; do
+            infra=$(basename "$dir")
+            if [ -f "${dir}kustomization.yaml" ]; then
+              kubectl kustomize "$dir" > "/tmp/rendered-manifests/${infra}.yaml" 2>/dev/null || true
+            fi
+          done
+
+      - name: Run Polaris audit
+        run: |
+          # Run polaris on rendered manifests
+          polaris audit --audit-path /tmp/rendered-manifests \
+            --format pretty \
+            --set-exit-code-below-score 60 || true
+
+          # Also output score summary
+          echo ""
+          echo "=== Polaris Score Summary ==="
+          polaris audit --audit-path /tmp/rendered-manifests \
+            --format score 2>/dev/null || echo "Score calculation failed"
+
   security:
     name: Security Scanning
     runs-on: [self-hosted, homelab]
@@ -114,7 +189,7 @@ jobs:
   ci-passed:
     name: CI Passed
     runs-on: [self-hosted, homelab]
-    needs: [validate-manifests, lint, security]
+    needs: [validate-manifests, lint, polaris, security]
     if: always()
     steps:
       - name: Check CI results
