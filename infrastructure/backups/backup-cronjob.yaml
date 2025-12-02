@@ -90,7 +90,7 @@ spec:
             - name: backup-storage
               nfs:
                 server: nfs-proxy.nfs-proxy.svc.cluster.local
-                path: /k8s-backup
+                path: /
 ---
 apiVersion: v1
 kind: ServiceAccount
