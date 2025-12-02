@@ -224,10 +224,10 @@ jobs:
       - name: Run Popeye scan
         run: |
           # Run popeye and capture score
-          popeye -A --force-exit-zero --format json > /tmp/popeye-report.json 2>/dev/null || true
+          popeye --all-namespaces --force-exit-zero -o json > /tmp/popeye-report.json 2>/dev/null || true
 
-          # Extract and display score
-          SCORE=$(jq -r '.score' /tmp/popeye-report.json 2>/dev/null || echo "0")
+          # Extract and display score (popeye JSON structure: .popeye.score)
+          SCORE=$(jq -r '.popeye.score // 0' /tmp/popeye-report.json 2>/dev/null || echo "0")
           echo "Cluster health score: ${SCORE}%"
 
           # Show summary of issues
@@ -240,7 +240,7 @@ jobs:
           if [ "${SCORE}" -lt "${THRESHOLD}" ]; then
             echo ""
             echo "ERROR: Cluster health score ${SCORE}% is below threshold of ${THRESHOLD}%"
-            echo "Run 'popeye -A' locally for full report"
+            echo "Run 'popeye --all-namespaces' locally for full report"
             exit 1
           fi
 

@@ -20,3 +20,10 @@ repos:
         entry: ./scripts/validate-kustomize.sh
         pass_filenames: false
         files: \.yaml$
+
+      - id: popeye-cluster-health
+        name: Popeye cluster health check
+        language: system
+        entry: ./scripts/check-popeye-score.sh
+        pass_filenames: false
+        stages: [pre-push]
