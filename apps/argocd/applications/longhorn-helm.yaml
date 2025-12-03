@@ -18,7 +18,7 @@ spec:
           defaultClassReplicaCount: 2
         defaultSettings:
           defaultReplicaCount: 2
-          backupTarget: nfs://192.168.1.234:/var/nfs/shared/Shared_Drive_Example
+          backupTarget: nfs://192.168.1.234:/volume/e8e70d24-82e0-45f1-8ef6-f8ca399ad2d6/.srv/.unifi-drive/Shared_Drive_Example/.data?nfsOptions=nfsvers=3,nolock
         preUpgradeChecker:
           jobEnabled: false
   destination:
