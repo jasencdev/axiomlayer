@@ -20,7 +20,6 @@ resources:
   - longhorn-helm.yaml
   - loki.yaml
   - n8n.yaml
-  - nfs-proxy.yaml
   - open-webui.yaml
   - outline.yaml
   - plane.yaml

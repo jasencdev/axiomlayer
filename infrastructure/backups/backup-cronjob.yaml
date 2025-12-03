@@ -1,5 +1,5 @@
 # Automated Backup CronJob
-# Backs up Authentik and Outline databases to NAS via nfs-proxy
+# Backs up Authentik and Outline databases directly to NAS
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -25,8 +25,6 @@ spec:
         spec:
           restartPolicy: OnFailure
           serviceAccountName: backup-sa
-          nodeSelector:
-            kubernetes.io/hostname: neko
           containers:
             - name: backup
               image: postgres:16-alpine
@@ -89,8 +87,8 @@ spec:
           volumes:
             - name: backup-storage
               nfs:
-                server: nfs-proxy.nfs-proxy.svc.cluster.local
-                path: /
+                server: 192.168.1.234
+                path: /var/nfs/shared/Shared_Drive_Example/k8s-backup
 ---
 apiVersion: v1
 kind: ServiceAccount
