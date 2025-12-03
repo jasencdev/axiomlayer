@@ -102,7 +102,7 @@ get_all_matching_files() {
 fetch_kb_files() {
     local result
     # Pass API key and KB ID via env vars to avoid shell expansion issues
-    result=$(kubectl exec -i -n open-webui "$POD" --  \
+    result=$(kubectl exec -n open-webui "$POD" --  \
         env "API_KEY=$OPEN_WEBUI_API_KEY" "KB_ID=$OPEN_WEBUI_KNOWLEDGE_ID" \
         sh -c 'curl -s -H "Authorization: Bearer $API_KEY" "http://localhost:8080/api/v1/knowledge/$KB_ID"' 2>/dev/null)
 
@@ -117,8 +117,8 @@ fetch_kb_files() {
     echo "$result"
 }
 
-# Parse KB response to get filename -> hash mapping
-# Outputs: filename<TAB>hash per line
+# Parse KB response to get filename -> hash and filename -> id mappings
+# Outputs: filename<TAB>hash<TAB>id per line
 parse_kb_files() {
     local kb_json="$1"
     echo "$kb_json" | python3 -c '
@@ -129,11 +129,29 @@ try:
     for f in files:
         name = f.get("meta", {}).get("name", "")
         h = f.get("hash", "")
-        if name and h:
-            print(f"{name}\t{h}")
+        fid = f.get("id", "")
+        if name and h and fid:
+            print(f"{name}\t{h}\t{fid}")
 except:
     pass
 '
+}
+
+# Remove file from knowledge base and delete it
+remove_file_from_kb() {
+    local file_id="$1"
+    kubectl exec -n open-webui "$POD" -- \
+        env "API_KEY=$OPEN_WEBUI_API_KEY" "KB_ID=$OPEN_WEBUI_KNOWLEDGE_ID" "FILE_ID=$file_id" \
+        sh -c '
+# Remove from KB
+curl -s -X POST -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
+    -d "{\"file_id\":\"$FILE_ID\"}" \
+    "http://localhost:8080/api/v1/knowledge/$KB_ID/file/remove" >/dev/null 2>&1
+# Delete the file
+curl -s -X DELETE -H "Authorization: Bearer $API_KEY" \
+    "http://localhost:8080/api/v1/files/$FILE_ID" >/dev/null 2>&1
+echo "OK"
+' 2>/dev/null
 }
 
 # Upload a file
@@ -146,22 +164,44 @@ upload_file() {
 
     # Upload and add to KB inside the pod
     # Pass credentials via env vars to avoid shell expansion issues
+    # Handles duplicate content by finding existing file with same hash
+    # Note: stdin redirected from /dev/null to prevent kubectl from consuming the while-read loop
     local result
-    result=$(kubectl exec -i -n open-webui "$POD" -- \
+    result=$(kubectl exec -n open-webui "$POD" -- \
         env "API_KEY=$OPEN_WEBUI_API_KEY" "KB_ID=$OPEN_WEBUI_KNOWLEDGE_ID" "FILENAME=$safe_name" \
         sh -c '
 RESP=$(curl -s -X POST -H "Authorization: Bearer $API_KEY" -F "file=@/tmp/sync-file;filename=$FILENAME" http://localhost:8080/api/v1/files/)
+
+# Check if response contains an error about duplicate content
+if echo "$RESP" | grep -qi "duplicate"; then
+    # File with same content already exists - this is actually OK
+    # The old file was removed, content exists elsewhere, KB was updated
+    echo "OK_DUPLICATE"
+    rm -f /tmp/sync-file
+    exit 0
+fi
+
 FID=$(echo "$RESP" | python3 -c "import sys,json;print(json.load(sys.stdin).get(\"id\",\"\"))" 2>/dev/null)
 if [ -n "$FID" ] && [ "$FID" != "None" ]; then
     ADD_RESP=$(curl -s -X POST -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" -d "{\"file_id\":\"$FID\"}" "http://localhost:8080/api/v1/knowledge/$KB_ID/file/add")
     if echo "$ADD_RESP" | python3 -c "import sys,json;d=json.load(sys.stdin);exit(0 if \"files\" in d else 1)" 2>/dev/null; then
         echo "OK"
     else
-        curl -s -X DELETE -H "Authorization: Bearer $API_KEY" "http://localhost:8080/api/v1/files/$FID" >/dev/null 2>&1
-        echo "FAIL_KB"
+        # Check if error is about file already being in KB (race condition or duplicate)
+        if echo "$ADD_RESP" | grep -qi "already"; then
+            echo "OK_ALREADY"
+        else
+            curl -s -X DELETE -H "Authorization: Bearer $API_KEY" "http://localhost:8080/api/v1/files/$FID" >/dev/null 2>&1
+            echo "FAIL_KB"
+        fi
     fi
 else
-    echo "FAIL_UPLOAD"
+    # Check if the response indicates the file already exists
+    if echo "$RESP" | grep -qi "exist\|duplicate"; then
+        echo "OK_EXISTS"
+    else
+        echo "FAIL_UPLOAD: $RESP"
+    fi
 fi
 rm -f /tmp/sync-file
 ' 2>/dev/null)
@@ -196,10 +236,14 @@ sync_to_rag() {
     local kb_json
     kb_json=$(fetch_kb_files)
 
-    # Build hash lookup (associative array)
+    # Build hash and ID lookups (associative arrays)
     declare -A KB_HASHES=()
-    while IFS=$'\t' read -r name hash; do
-        [[ -n "$name" ]] && KB_HASHES["$name"]="$hash"
+    declare -A KB_FILE_IDS=()
+    while IFS=$'\t' read -r name hash fid; do
+        if [[ -n "$name" ]]; then
+            KB_HASHES["$name"]="$hash"
+            KB_FILE_IDS["$name"]="$fid"
+        fi
     done < <(parse_kb_files "$kb_json")
 
     local kb_count="${#KB_HASHES[@]}"
@@ -263,6 +307,11 @@ sync_to_rag() {
         # File is new or changed - upload it
         if [[ -n "$kb_hash" ]]; then
             log_info "Updating: $file (hash changed)"
+            # Remove old file from KB first to avoid duplicate content error
+            local old_file_id="${KB_FILE_IDS[$safe_name]:-}"
+            if [[ -n "$old_file_id" ]]; then
+                remove_file_from_kb "$old_file_id" >/dev/null
+            fi
         else
             log_info "Adding: $file (new file)"
         fi
