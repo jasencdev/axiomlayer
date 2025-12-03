@@ -1,5 +1,16 @@
 # Encrypted Backup Recovery
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Backup Contents](#backup-contents)
+- [Accessing Encrypted Drives](#accessing-encrypted-drives)
+- [Recovery Procedures](#recovery-procedures)
+- [Safely Unmounting](#safely-unmounting)
+- [Drive Identification](#drive-identification)
+- [Backup Locations](#backup-locations)
+- [Notes](#notes)
+
 ## Overview
 
 Full homelab backups are stored on LUKS-encrypted USB drives. This document describes how to access and restore from these backups.

@@ -2,6 +2,21 @@
 
 This document explains the tag-based versioned sync approach for RAG synchronization, which solves issues with sync markers and ChromaDB duplicate detection.
 
+## Table of Contents
+
+- [Summary](#summary)
+- [How It Works](#how-it-works)
+- [CI Integration](#ci-integration)
+- [Environment Variables](#environment-variables)
+- [Release Workflow](#release-workflow)
+- [Manual Sync](#manual-sync)
+- [File Scope and Exclusions](#file-scope-and-exclusions)
+- [KB Cleanup Strategy](#kb-cleanup-strategy)
+- [Troubleshooting](#troubleshooting)
+- [Migration from Commit-Based Sync](#migration-from-commit-based-sync)
+- [Security Considerations](#security-considerations)
+- [Implementation Notes](#implementation-notes)
+
 ## Summary
 
 - **Problem 1**: Sync markers (`.rag-sync-commit`) were gitignored, causing CI to lose sync state between runs

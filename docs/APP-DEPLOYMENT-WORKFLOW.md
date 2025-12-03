@@ -2,6 +2,17 @@
 
 This guide covers the complete workflow for adding new applications to the homelab GitOps cluster.
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Prerequisites](#prerequisites)
+- [Step-by-Step Workflow](#step-by-step-workflow)
+- [TLS Certificate Management with cert-manager](#tls-certificate-management-with-cert-manager)
+- [Optional Components](#optional-components)
+- [Verification Checklist](#verification-checklist)
+- [Quick Reference Commands](#quick-reference-commands)
+- [App of Apps Architecture](#app-of-apps-architecture)
+
 ## Overview
 
 This cluster uses an **App of Apps** pattern for fully automated deployments. Once you create the manifests and push to GitHub, ArgoCD automatically syncs everything - no manual `kubectl apply` needed.

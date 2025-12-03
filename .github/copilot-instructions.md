@@ -1,5 +1,19 @@
 # Copilot Instructions - Homelab GitOps Repository
 
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Shell Compatibility](#shell-compatibility)
+- [Repository Structure](#repository-structure)
+- [Tech Stack](#tech-stack)
+- [Coding Standards](#coding-standards)
+- [Validation Commands](#validation-commands)
+- [Adding a New Service](#adding-a-new-service)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [Key Patterns](#key-patterns)
+- [Boundaries](#boundaries)
+- [Testing](#testing)
+
 ## Project Overview
 
 This is a GitOps-managed K3s homelab cluster repository. Changes are automatically deployed via ArgoCD when pushed to main.

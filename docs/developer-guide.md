@@ -1,5 +1,19 @@
 # Developer Guide: Deploying Apps to Axiomlayer
 
+## Table of Contents
+
+- [The Experience](#the-experience)
+- [Quick Start: Deploy Your First App](#quick-start-deploy-your-first-app)
+- [What the Platform Does For You](#what-the-platform-does-for-you)
+- [Adding a Database](#adding-a-database)
+- [Secrets](#secrets)
+- [Updating Your App](#updating-your-app)
+- [Break Glass: Emergency Operations](#break-glass-emergency-operations)
+- [Monitoring](#monitoring)
+- [The Flow](#the-flow)
+- [Checklist for New Apps](#checklist-for-new-apps)
+- [That's It](#thats-it)
+
 ## The Experience
 
 You build a containerized app. You push it. The platform does the rest.
