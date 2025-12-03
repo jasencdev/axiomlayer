@@ -60,7 +60,7 @@ rules:
     verbs: ["get", "list"]
   # Read-only access to Longhorn
   - apiGroups: ["longhorn.io"]
-    resources: ["volumes", "nodes"]
+    resources: ["volumes", "nodes", "recurringjobs", "settings", "backups", "backuptargets"]
     verbs: ["get", "list"]
   # Read-only access to Prometheus Operator CRDs
   - apiGroups: ["monitoring.coreos.com"]

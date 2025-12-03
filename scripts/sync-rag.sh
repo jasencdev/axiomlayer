@@ -181,12 +181,13 @@ sync_to_rag() {
     kb_json=$(fetch_kb_files)
 
     # Build hash lookup (associative array)
-    declare -A KB_HASHES
+    declare -A KB_HASHES=()
     while IFS=$'\t' read -r name hash; do
         [[ -n "$name" ]] && KB_HASHES["$name"]="$hash"
     done < <(parse_kb_files "$kb_json")
 
-    log_info "Found ${#KB_HASHES[@]} existing files in knowledge base"
+    local kb_count="${#KB_HASHES[@]}"
+    log_info "Found $kb_count existing files in knowledge base"
     echo ""
 
     local uploaded=0
@@ -263,7 +264,7 @@ sync_to_rag() {
 
     echo ""
     log_info "===== Sync Summary ====="
-    log_info "  Files in KB:  ${#KB_HASHES[@]}"
+    log_info "  Files in KB:  $kb_count"
     log_info "  Unchanged:    $unchanged (skipped - no embedding needed)"
     log_info "  Uploaded:     $uploaded"
     log_info "  Skipped:      $skipped (too large)"
