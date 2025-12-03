@@ -1,5 +1,7 @@
 # Longhorn Recurring Backup Jobs
-# These create automatic snapshots and backups of all volumes
+# Snapshots are local (fast recovery), Backups go to NAS (disaster recovery)
+---
+# Local Snapshots - fast point-in-time recovery within cluster
 apiVersion: longhorn.io/v1beta2
 kind: RecurringJob
 metadata:
@@ -34,6 +36,45 @@ spec:
   task: snapshot
   cron: "0 3 * * 0"  # 3 AM every Sunday
   retain: 4           # Keep 4 weekly snapshots
+  concurrency: 2
+  groups:
+    - default
+---
+# Remote Backups to NAS - disaster recovery
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: daily-backup
+  namespace: longhorn-system
+  labels:
+    app.kubernetes.io/name: longhorn
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  name: daily-backup
+  task: backup
+  cron: "30 2 * * *"  # 2:30 AM daily (after snapshots)
+  retain: 7           # Keep 7 daily backups on NAS
+  concurrency: 2
+  groups:
+    - default
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: weekly-backup
+  namespace: longhorn-system
+  labels:
+    app.kubernetes.io/name: longhorn
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: homelab
+    app.kubernetes.io/managed-by: argocd
+spec:
+  name: weekly-backup
+  task: backup
+  cron: "30 3 * * 0"  # 3:30 AM every Sunday (after weekly snapshot)
+  retain: 4           # Keep 4 weekly backups on NAS
   concurrency: 2
   groups:
     - default
