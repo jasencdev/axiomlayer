@@ -10,6 +10,25 @@ GitOps-managed K3s homelab with ArgoCD, SSO, TLS, and observability.
 
 > **⚠️ Shell Compatibility**: This project requires **zsh**. All documentation commands are tested with zsh 5.9. Scripts use `#!/bin/bash` shebangs and are portable, but interactive commands assume zsh. See `CLAUDE.md` for details.
 
+## Table of Contents
+
+- [Live Services](#live-services)
+- [Architecture](#architecture)
+- [Directory Structure](#directory-structure)
+- [How It Works](#how-it-works)
+- [CI/CD with Self-Hosted Runners](#cicd-with-self-hosted-runners)
+- [SSO Integration](#sso-integration)
+- [Alerting](#alerting)
+- [Longhorn Storage](#longhorn-storage)
+- [Adding a New Application](#adding-a-new-application)
+- [Infrastructure Components](#infrastructure-components)
+- [Secrets Management](#secrets-management)
+- [Common Commands](#common-commands)
+- [Troubleshooting](#troubleshooting)
+- [Bootstrap (Fresh Cluster)](#bootstrap-fresh-cluster)
+- [Roadmap](#roadmap)
+- [Notes](#notes)
+
 ---
 
 ## Live Services

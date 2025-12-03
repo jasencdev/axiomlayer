@@ -4,6 +4,23 @@ This document provides a comprehensive overview of the GitHub Actions CI/CD pipe
 
 **Pipeline File**: `.github/workflows/ci.yaml`
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Triggers](#triggers)
+- [Pipeline Jobs](#pipeline-jobs)
+- [Concurrency Control](#concurrency-control)
+- [Permissions](#permissions)
+- [GitHub Secrets](#github-secrets)
+- [Self-Hosted Runner](#self-hosted-runner)
+- [Pipeline Execution Time](#pipeline-execution-time)
+- [Troubleshooting](#troubleshooting)
+- [Best Practices](#best-practices)
+- [Future Enhancements](#future-enhancements)
+- [See Also](#see-also)
+
+---
+
 ## Overview
 
 The CI/CD pipeline automates validation, testing, deployment, and documentation synchronization for the homelab cluster.

@@ -71,7 +71,7 @@ This directory contains automated tests for verifying homelab cluster health, se
    - Alertmanager healthy
 9. **Backups**:
    - CronJob exists
-   - NFS proxy accessible
+   - Longhorn recurring jobs configured
 
 **Usage**:
 ```bash
@@ -469,45 +469,60 @@ kubectl logs -n kube-system -l k8s-app=kube-flannel
 
 ### test-backup-restore.sh
 
-**Purpose**: Validates backup automation and restore capabilities.
+**Purpose**: Validates the two-layer backup strategy: Longhorn volume backups + SQL dumps.
 
-**Test Count**: ~25 tests
+**Test Count**: ~45 tests
 
 **What it tests**:
-1. **Backup Infrastructure**:
+
+1. **SQL Dump CronJob**:
    - Backup CronJob exists and configured
-   - CronJob schedule correct (3:00 AM daily)
-   - NFS proxy accessible
-   - Backup namespace healthy
+   - CronJob schedule correct (4:00 AM daily)
+   - Last backup succeeded within 48 hours
+   - Backup retention configured
 
-2. **Manual Backup Trigger**:
-   - Can create Job from CronJob
-   - Job completes successfully
-   - Backup files created on NAS
+2. **Database Connectivity**:
+   - Authentik database service accessible
+   - Outline database service accessible
+   - Database pods running
+   - Endpoints available
 
-3. **Backup Content Validation**:
-   - Authentik database backup exists
-   - Outline database backup exists
-   - Backup files are valid SQL dumps
-   - Backup timestamps recent
+3. **Longhorn Recurring Jobs**:
+   - daily-snapshot job exists (2:00 AM)
+   - weekly-snapshot job exists (3:00 AM Sunday)
+   - daily-backup job exists (2:30 AM)
+   - weekly-backup job exists (3:30 AM Sunday)
+   - All jobs have correct schedules and retention
 
-4. **Backup Retention**:
-   - Old backups cleaned up (7 day retention)
-   - Correct number of backups present
+4. **Longhorn Backup Target**:
+   - Backup target configured to NAS (192.168.1.234)
+   - NFS options configured correctly
+   - Backup target is available/accessible
 
-5. **Dry-Run Restore**:
-   - Backup files can be read
-   - SQL syntax valid
-   - Restore process dry-run succeeds
+5. **Longhorn Backup History**:
+   - Backups exist in the system
+   - Recent backups within 48 hours
+   - Completed backups found
+   - Volumes have been backed up
 
-6. **NFS Connectivity**:
-   - NFS proxy pods running
-   - NAS mount accessible
-   - Write permissions correct
+6. **Longhorn Volume Health**:
+   - All volumes healthy (affects backup reliability)
+   - No degraded volumes
+   - No faulted volumes (CRITICAL)
 
-**Databases Backed Up**:
-- Authentik (authentik namespace)
-- Outline (outline namespace)
+7. **Optional Tests** (enable via environment variables):
+   - Manual backup execution test
+   - Backup file verification via NFS
+
+**Backup Schedule**:
+
+| Job | Type | Schedule | Retention |
+|-----|------|----------|-----------|
+| daily-snapshot | Longhorn | 2:00 AM daily | 7 |
+| weekly-snapshot | Longhorn | 3:00 AM Sunday | 4 |
+| daily-backup | Longhorn | 2:30 AM daily | 7 |
+| weekly-backup | Longhorn | 3:30 AM Sunday | 4 |
+| homelab-backup | SQL dump | 4:00 AM daily | 7 |
 
 **Usage**:
 ```bash
@@ -515,37 +530,47 @@ kubectl logs -n kube-system -l k8s-app=kube-flannel
 
 # Expected output:
 # ═══════════════════════════════════════════════════════════════
-#   Backup and Restore Tests
+#   Backup and Restore Verification Tests
 # ═══════════════════════════════════════════════════════════════
 #
-# ─── Backup Infrastructure Tests ───
-# ✓ PASS: Backup CronJob exists
-# ✓ PASS: NFS proxy accessible
-# ✓ PASS: Backup namespace healthy
+# ─── Backup CronJob Configuration Tests ───
+# ✓ PASS: Backup CronJob 'homelab-backup' exists
+# ✓ PASS: Backup CronJob has schedule configured: 0 4 * * *
 #
-# ─── Backup Content Tests ───
-# ✓ PASS: Recent Authentik backup exists
-# ✓ PASS: Recent Outline backup exists
-# ✓ PASS: Backup files are valid SQL dumps
+# ─── Longhorn Recurring Backup Job Tests ───
+# ✓ PASS: Longhorn recurring job 'daily-snapshot' exists
+# ✓ PASS: Job 'daily-snapshot' has schedule: 0 2 * * * (task: snapshot, retain: 7)
+# ✓ PASS: Longhorn recurring job 'daily-backup' exists
+# ✓ PASS: Job 'daily-backup' has schedule: 30 2 * * * (task: backup, retain: 7)
+#
+# ─── Longhorn Backup Target Tests ───
+# ✓ PASS: Longhorn backup target configured
+# ✓ PASS: Backup target points to NAS (192.168.1.234)
+#
+# ─── Longhorn Backup History Tests ───
+# ✓ PASS: Found 156 Longhorn backup(s)
+# ✓ PASS: Recent backup is 8 hours old (within 48h threshold)
 # ...
 ```
 
 **Exit Codes**:
 - `0`: All tests passed ✅
 - `1`: At least one test failed ❌
-- `2`: Prerequisites not met
+
+**Environment Variables**:
+- `RUN_BACKUP_TEST=true` - Run manual backup execution test
+- `VERIFY_BACKUP_FILES=true` - Run NFS file verification test
 
 **Prerequisites**:
 - kubectl access
-- Write permissions (for manual backup trigger)
-- NFS proxy running
+- longhorn-system namespace exists
+- Longhorn installed with recurring jobs
 - CloudNativePG databases healthy
 
-**Backup Configuration**:
-- **CronJob**: `infrastructure/backups/backup-cronjob.yaml`
-- **Schedule**: Daily at 3:00 AM
-- **Retention**: 7 days
-- **Location**: UniFi NAS at 192.168.1.234 via NFS proxy
+**Backup Configuration Files**:
+- **Longhorn recurring jobs**: `infrastructure/backups/longhorn-recurring-jobs.yaml`
+- **SQL dump CronJob**: `infrastructure/backups/backup-cronjob.yaml`
+- **Longhorn helm values**: `apps/argocd/applications/longhorn-helm.yaml`
 
 **CI/CD**: Runs weekly (not on every push due to time requirements).
 
@@ -554,32 +579,35 @@ kubectl logs -n kube-system -l k8s-app=kube-flannel
 - Before cluster maintenance
 - After backup configuration changes
 - When investigating backup issues
+- After Longhorn upgrades
 
-**Triggering Manual Backup**:
+**Triggering Manual Backups**:
 ```bash
-# Create job from CronJob
+# Manual SQL dump
 kubectl create job --from=cronjob/homelab-backup homelab-backup-test -n longhorn-system
-
-# Watch job progress
 kubectl logs -n longhorn-system -l job-name=homelab-backup-test --follow
 
-# Verify backup files
-kubectl exec -n nfs-proxy deployment/nfs-proxy -- ls -lh /mnt/nas-backup/
+# Manual Longhorn backup (via UI recommended)
+# Go to https://longhorn.lab.axiomlayer.com → Volume → Create Backup
 ```
 
 **Troubleshooting**:
 ```bash
-# Check CronJob
-kubectl get cronjob -n longhorn-system
+# Check Longhorn recurring jobs
+kubectl get recurringjobs -n longhorn-system
 
-# Check last job
-kubectl get jobs -n longhorn-system
+# Check backup target
+kubectl get settings backup-target -n longhorn-system -o jsonpath='{.value}'
 
-# Check NFS proxy
-kubectl logs -n nfs-proxy deployment/nfs-proxy
+# Check recent backups
+kubectl get backups -n longhorn-system --sort-by=.metadata.creationTimestamp | tail -10
 
-# Check database accessibility
-kubectl exec -n authentik authentik-db-1 -- pg_dump --version
+# Check SQL dump CronJob
+kubectl get cronjob homelab-backup -n longhorn-system
+
+# Test NFS connectivity
+kubectl run nfs-test --rm -it --image=busybox --restart=Never -- sh -c \
+  "mount -t nfs -o nfsvers=3 192.168.1.234:/var/nfs/shared/Shared_Drive_Example/k8s-backup /mnt && ls /mnt"
 ```
 
 ---

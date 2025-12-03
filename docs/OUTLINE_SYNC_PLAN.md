@@ -2,6 +2,16 @@
 
 Working notes for moving the refreshed engineering docs into Outline and the company wiki.
 
+## Table of Contents
+
+- [Goals](#goals)
+- [Proposed Outline Structure](#proposed-outline-structure)
+- [API Workflow](#api-workflow)
+- [Next Actions](#next-actions)
+- [Automation Hook](#automation-hook)
+
+---
+
 ## Goals
 
 1. Keep the engineering source of truth in Git while mirroring the latest content into Outline for easier discovery.

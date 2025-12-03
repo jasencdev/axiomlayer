@@ -3,6 +3,20 @@
 **Generated**: 2025-12-01
 **Purpose**: Comprehensive inventory of all components for documentation completeness
 
+## Table of Contents
+
+- [Applications (apps/)](#applications-apps)
+- [Infrastructure Components (infrastructure/)](#infrastructure-components-infrastructure)
+- [Scripts (scripts/)](#scripts-scripts)
+- [Test Scripts (tests/)](#test-scripts-tests)
+- [Documentation Files](#documentation-files)
+- [Secrets and Environment Variables](#secrets-and-environment-variables)
+- [ArgoCD Applications](#argocd-applications)
+- [Gaps and Action Items](#gaps-and-action-items)
+- [Summary](#summary)
+
+---
+
 ## Applications (apps/)
 
 | Directory | Status | Documentation | Notes |

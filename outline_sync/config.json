@@ -1,66 +1,27 @@
 {
   "apiUrl": "https://docs.lab.axiomlayer.com/api",
   "collectionName": "Axiomlayer Engineering",
-  "documents": [
-    {
-      "path": "README.md",
-      "title": "Home"
-    },
-    {
-      "path": "CONTRIBUTING.md",
-      "title": "Contributing Guidelines"
-    },
-    {
-      "path": "docs/ARCHITECTURE.md",
-      "title": "Architecture Overview"
-    },
-    {
-      "path": "docs/INFRASTRUCTURE.md",
-      "title": "Infrastructure Components"
-    },
-    {
-      "path": "docs/APPLICATIONS.md",
-      "title": "Application Catalog"
-    },
-    {
-      "path": "docs/NETWORKING.md",
-      "title": "Networking & TLS"
-    },
-    {
-      "path": "docs/RUNBOOKS.md",
-      "title": "Runbooks"
-    },
-    {
-      "path": "docs/TROUBLESHOOTING.md",
-      "title": "Troubleshooting Guide"
-    },
-    {
-      "path": "docs/SECRETS.md",
-      "title": "Secrets & Sealed Secrets"
-    },
-    {
-      "path": "docs/OUTLINE_SYNC_PLAN.md",
-      "title": "Outline Sync"
-    },
-    {
-      "path": "docs/REPOSITORY_INVENTORY.md",
-      "title": "Repository Inventory & Audit"
-    },
-    {
-      "path": "docs/CI_CD_PIPELINE.md",
-      "title": "CI/CD Pipeline"
-    },
-    {
-      "path": "docs/DOCUMENTATION_AUDIT_REPORT.md",
-      "title": "Documentation Audit Report"
-    },
-    {
-      "path": "scripts/README.md",
-      "title": "Scripts Documentation"
-    },
-    {
-      "path": "tests/README.md",
-      "title": "Test Suite Documentation"
-    }
-  ]
+  "patterns": [
+    "README.md",
+    "CONTRIBUTING.md",
+    "CLAUDE.md",
+    "docs/*.md",
+    "scripts/README.md",
+    "tests/README.md"
+  ],
+  "excludePatterns": [
+    "**/AGENTS.md",
+    "**/*-draft*",
+    "**/*-old*"
+  ],
+  "titleOverrides": {
+    "README.md": "Home",
+    "CONTRIBUTING.md": "Contributing Guidelines",
+    "CLAUDE.md": "Operator Guide"
+  },
+  "categoryPrefixes": {
+    "docs": "Docs",
+    "scripts": "Scripts",
+    "tests": "Tests"
+  }
 }

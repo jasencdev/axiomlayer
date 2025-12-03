@@ -2,6 +2,21 @@
 
 Thank you for contributing to the Axiomlayer homelab GitOps repository!
 
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Shell Compatibility Requirements](#shell-compatibility-requirements)
+- [Code Style](#code-style)
+- [Adding a New Application](#adding-a-new-application)
+- [Secrets Management](#secrets-management)
+- [Testing](#testing)
+- [Documentation](#documentation)
+- [Git Workflow](#git-workflow)
+- [Code Review Checklist](#code-review-checklist)
+- [Getting Help](#getting-help)
+
+---
+
 ## Prerequisites
 
 - **Shell**: zsh 5.9+ (all commands must be zsh-compatible)

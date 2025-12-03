@@ -17,7 +17,6 @@ Detailed documentation for all infrastructure components in the homelab cluster.
 - [Prometheus + Grafana](#prometheus--grafana)
 - [Alertmanager](#alertmanager)
 - [Actions Runner Controller](#actions-runner-controller)
-- [NFS Proxy](#nfs-proxy)
 
 ---
 
@@ -479,7 +478,7 @@ kubectl get secret argocd-initial-admin-secret -n argocd \
 
 ## Longhorn (Storage)
 
-**Distributed Block Storage**
+**Distributed Block Storage with Integrated Backups**
 
 ### Overview
 
@@ -487,8 +486,9 @@ kubectl get secret argocd-initial-admin-secret -n argocd \
 |----------|-------|
 | Namespace | longhorn-system |
 | URL | https://longhorn.lab.axiomlayer.com |
-| Default Replicas | 3 |
+| Default Replicas | 2 |
 | Storage Class | longhorn (default) |
+| Backup Target | NAS at 192.168.1.234 |
 
 ### Architecture
 
@@ -505,15 +505,15 @@ kubectl get secret argocd-initial-admin-secret -n argocd \
 │                            │                                        │
 │                     ┌──────▼──────┐                                 │
 │                     │   Volume    │                                 │
-│                     │ (3 replicas)│                                 │
+│                     │ (2 replicas)│                                 │
 │                     └──────┬──────┘                                 │
 │                            │                                        │
-│    ┌───────────────────────┼───────────────────────┐               │
-│    ▼           ▼                      ▼            ▼               │
-│ ┌───────┐  ┌───────┐            ┌───────┐    ┌───────┐            │
-│ │Replica│  │Replica│            │Replica│    │Replica│            │
-│ │(neko) │  │(neko2)│            │(panther)   │(bobcat)│           │
-│ └───────┘  └───────┘            └───────┘    └───────┘            │
+│         ┌──────────────────┼──────────────────┐                    │
+│         ▼                  ▼                  ▼                    │
+│    ┌───────┐          ┌───────┐          ┌───────┐                │
+│    │Replica│          │Replica│          │ Backup │               │
+│    │(node1)│          │(node2)│          │ (NAS)  │               │
+│    └───────┘          └───────┘          └───────┘                │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -521,48 +521,42 @@ kubectl get secret argocd-initial-admin-secret -n argocd \
 ### Storage Classes
 
 ```yaml
-# Default (3 replicas)
+# Default (2 replicas - balances redundancy and storage)
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: longhorn
 provisioner: driver.longhorn.io
 parameters:
-  numberOfReplicas: "3"
-  staleReplicaTimeout: "2880"
-
-# 2 replicas (for large volumes)
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: longhorn-2-replicas
-provisioner: driver.longhorn.io
-parameters:
   numberOfReplicas: "2"
+  staleReplicaTimeout: "2880"
 ```
 
 ### Backup Configuration
 
-```yaml
-# Backup target
-apiVersion: longhorn.io/v1beta2
-kind: Setting
-metadata:
-  name: backup-target
-spec:
-  value: nfs://nfs-proxy.nfs-proxy.svc:/exports
+Longhorn is configured to backup all volumes to the UniFi NAS:
 
-# Recurring backup job
-apiVersion: longhorn.io/v1beta2
-kind: RecurringJob
-metadata:
-  name: daily-backup
-spec:
-  cron: "0 2 * * *"   # 2:00 AM daily
-  task: backup
-  retain: 7
-  concurrency: 1
+```yaml
+# apps/argocd/applications/longhorn-helm.yaml
+defaultSettings:
+  defaultReplicaCount: 2
+  backupTarget: nfs://192.168.1.234:/var/nfs/shared/Shared_Drive_Example/k8s-backup
 ```
+
+### Recurring Backup Jobs
+
+Defined in `infrastructure/backups/longhorn-recurring-jobs.yaml`:
+
+| Job | Type | Schedule | Retention | Purpose |
+|-----|------|----------|-----------|---------|
+| daily-snapshot | snapshot | 2:00 AM daily | 7 | Fast local rollback |
+| weekly-snapshot | snapshot | 3:00 AM Sunday | 4 | Weekly local checkpoint |
+| daily-backup | backup | 2:30 AM daily | 7 | Daily disaster recovery |
+| weekly-backup | backup | 3:30 AM Sunday | 4 | Weekly archive |
+
+**Snapshots vs Backups:**
+- **Snapshots**: Local, fast, stored on cluster nodes
+- **Backups**: Remote, stored on NAS, survive cluster loss
 
 ### Commands
 
@@ -574,46 +568,80 @@ kubectl get volumes -n longhorn-system
 kubectl get volumes -n longhorn-system \
   -o custom-columns=NAME:.metadata.name,STATE:.status.state,ROBUSTNESS:.status.robustness
 
-# List nodes
-kubectl get nodes.longhorn.io -n longhorn-system
-
 # Check backup target
-kubectl get backuptargets -n longhorn-system
+kubectl get settings backup-target -n longhorn-system -o jsonpath='{.value}'
+
+# List recurring jobs
+kubectl get recurringjobs -n longhorn-system
+
+# List recent backups
+kubectl get backups -n longhorn-system --sort-by=.metadata.creationTimestamp | tail -10
 
 # View manager logs
 kubectl logs -n longhorn-system -l app=longhorn-manager -f
 ```
 
+### Accessing Longhorn UI
+
+1. Go to https://longhorn.lab.axiomlayer.com
+2. Authenticate via Authentik (forward auth)
+3. **Dashboard**: Overview of cluster storage health
+4. **Volume**: Manage individual volumes, create snapshots/backups
+5. **Backup**: View and restore from backups
+6. **Recurring Job**: Configure backup schedules
+
 ---
 
 ## Backups
 
-**Automated database dumps and Longhorn exports**
+**Two-layer backup strategy: Longhorn volume backups + SQL dumps**
 
-### CronJob + Secrets
+For comprehensive backup documentation, see **[docs/BACKUPS.md](BACKUPS.md)**.
 
-- `apps/argocd/applications/backups.yaml` syncs the `infrastructure/backups` kustomization, which includes `backup-cronjob.yaml` for the 03:00 database dumps on `neko`. The job pg_dumps Authentik (`authentik-db-rw`) and Outline (`outline-db-rw`), writes the results to `/backup` (NAS via the NFS proxy), and trims everything beyond the seven newest archives.
-- `infrastructure/backups/backup-db-credentials-sealed.yaml` provides the database passwords as a Sealed Secret in `longhorn-system`.
+### Summary
 
-### Longhorn Recurring Jobs
+| Layer | What | Schedule | Retention | Purpose |
+|-------|------|----------|-----------|---------|
+| Longhorn Snapshots | All PVCs | 2:00 AM daily | 7 days | Fast local rollback |
+| Longhorn Backups | All PVCs | 2:30 AM daily | 7 days | Disaster recovery (to NAS) |
+| SQL Dumps | Authentik, Outline | 4:00 AM daily | 7 days | Portable database backups |
 
-- `infrastructure/backups/longhorn-recurring-jobs.yaml` describes the snapshot + backup cadence for Longhorn volumes so new PVCs inherit the 02:00 schedule and seven-day retention without manual UI edits.
+### Files
 
-### Operator Script
+| File | Purpose |
+|------|---------|
+| `infrastructure/backups/longhorn-recurring-jobs.yaml` | Snapshot and backup schedules |
+| `infrastructure/backups/backup-cronjob.yaml` | Database SQL dump CronJob |
+| `infrastructure/backups/backup-db-credentials-sealed.yaml` | Database passwords (sealed) |
+| `apps/argocd/applications/backups.yaml` | ArgoCD Application |
 
-- `scripts/backup-homelab.sh` is the manual safety net: it copies `.env`, exports the Sealed Secret keys, takes fresh CNPG dumps by exec'ing into the pods, and captures Longhorn settings to a timestamped folder (`~/homelab-backups/{DATE}` by default).
+### Backup Target
+
+All backups go to the UniFi NAS via direct NFS mount:
+
+| Property | Value |
+|----------|-------|
+| NAS IP | 192.168.1.234 |
+| NFS Path | /var/nfs/shared/Shared_Drive_Example/k8s-backup |
+| Protocol | NFSv3 |
 
 ### Commands
 
 ```bash
-# Check CronJob + Jobs
-kubectl get cronjobs,job -n longhorn-system -l app.kubernetes.io/name=homelab-backup
+# Check Longhorn recurring jobs
+kubectl get recurringjobs -n longhorn-system
 
-# Inspect the last run
-kubectl logs job/<job-name> -n longhorn-system
+# Check SQL dump CronJob
+kubectl get cronjob homelab-backup -n longhorn-system
 
-# Trigger an on-demand run
+# List recent Longhorn backups
+kubectl get backups -n longhorn-system --sort-by=.metadata.creationTimestamp | tail -10
+
+# Trigger manual SQL dump
 kubectl create job --from=cronjob/homelab-backup homelab-backup-manual-$(date +%s) -n longhorn-system
+
+# View backup job logs
+kubectl logs -n longhorn-system -l app.kubernetes.io/name=homelab-backup --tail=50
 ```
 
 ---
@@ -913,50 +941,3 @@ kubectl get pods -n actions-runner -l app.kubernetes.io/name=actions-runner-cont
 kubectl logs -n actions-runner -l actions.github.com/scale-set-name=homelab-runner
 ```
 
----
-
-## NFS Proxy
-
-**NFS Re-Export for Multi-Node Access**
-
-### Overview
-
-| Property | Value |
-|----------|-------|
-| Namespace | nfs-proxy |
-| Node | neko only (nodeSelector) |
-| Backend | UniFi NAS (192.168.1.234) |
-
-### Why It Exists
-
-UniFi NAS NFS exports only accept a single client IP. The proxy:
-1. Runs on neko (192.168.1.167) - the allowed IP
-2. Mounts NAS share: `192.168.1.234:/k8s-backup`
-3. Re-exports via ClusterIP service
-4. All nodes access via service IP
-
-### Requirements
-
-The `nfsd` kernel module must be loaded on neko:
-
-```bash
-# Enable on boot
-echo "nfsd" | sudo tee /etc/modules-load.d/nfsd.conf
-
-# Load immediately
-sudo modprobe nfsd
-```
-
-### Commands
-
-```bash
-# Check proxy pod
-kubectl get pods -n nfs-proxy
-
-# View logs
-kubectl logs -n nfs-proxy -l app.kubernetes.io/name=nfs-proxy
-
-# Test mount from another pod
-kubectl run test --rm -it --image=busybox -- \
-  mount -t nfs nfs-proxy.nfs-proxy.svc:/exports /mnt
-```

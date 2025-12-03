@@ -131,13 +131,6 @@ else
     fail "Actions Runner Controller is not running"
 fi
 
-# NFS Proxy
-if kubectl get pods -n nfs-proxy -l app.kubernetes.io/name=nfs-proxy --no-headers 2>/dev/null | grep -q "Running"; then
-    pass "NFS Proxy is running"
-else
-    fail "NFS Proxy is not running"
-fi
-
 section "Authentication"
 
 # Authentik server
@@ -490,6 +483,24 @@ if [ -n "$LAST_JOB" ]; then
     fi
 else
     warn "No backup job history found"
+fi
+
+# Check Longhorn recurring jobs exist
+RECURRING_JOBS=("daily-snapshot" "weekly-snapshot" "daily-backup" "weekly-backup")
+for job in "${RECURRING_JOBS[@]}"; do
+    if kubectl get recurringjobs.longhorn.io "$job" -n longhorn-system --no-headers 2>/dev/null | grep -q "$job"; then
+        pass "Longhorn recurring job '$job' exists"
+    else
+        fail "Longhorn recurring job '$job' not found"
+    fi
+done
+
+# Check Longhorn backup target is configured
+BACKUP_TARGET=$(kubectl get settings.longhorn.io backup-target -n longhorn-system -o jsonpath='{.value}' 2>/dev/null || echo "")
+if [ -n "$BACKUP_TARGET" ]; then
+    pass "Longhorn backup target configured"
+else
+    fail "Longhorn backup target not configured"
 fi
 
 section "Resource Configuration"

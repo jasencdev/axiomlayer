@@ -1,16 +1,19 @@
 #!/bin/bash
 # sync-outline.sh - Sync markdown docs to Outline wiki
 #
-# Tag-based sync: Only runs on git tag pushes, compares against previous tag.
-# Maintains state in outline_sync/state.json to track document IDs.
+# Features:
+#   - Glob pattern matching for automatic file discovery
+#   - Hash-based smart sync (only updates changed documents)
+#   - Hierarchical titles based on directory structure (e.g., "Docs: Architecture")
+#   - Title overrides for specific files
+#   - Exclude patterns for files to skip
 #
 # Required environment variables:
 #   OUTLINE_API_TOKEN - API token from Outline Settings
 #
 # Optional environment variables:
 #   OUTLINE_API_URL - Base API URL (default: https://docs.lab.axiomlayer.com/api)
-#   OUTLINE_VERSION - Version tag (default: from git describe)
-#   FORCE_FULL_SYNC - Set to "true" to sync all files
+#   FORCE_FULL_SYNC - Set to "true" to sync all files regardless of changes
 
 set -euo pipefail
 
@@ -19,9 +22,6 @@ REPO_ROOT="${REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 CONFIG_FILE="$REPO_ROOT/outline_sync/config.json"
 STATE_FILE="$REPO_ROOT/outline_sync/state.json"
 OUTLINE_API_URL="${OUTLINE_API_URL:-https://docs.lab.axiomlayer.com/api}"
-
-# Get version from env or git tag
-OUTLINE_VERSION="${OUTLINE_VERSION:-$(git describe --tags --abbrev=0 2>/dev/null || echo 'unversioned')}"
 
 # Colors
 RED='\033[0;31m'
@@ -33,7 +33,7 @@ NC='\033[0m'
 log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
-log_debug() { echo -e "${BLUE}[DEBUG]${NC} $1"; }
+log_skip() { echo -e "${BLUE}[SKIP]${NC} $1"; }
 
 # Check required tools and environment
 check_requirements() {
@@ -97,6 +97,11 @@ outline_api() {
     echo "$response"
 }
 
+# Compute SHA256 hash of content
+compute_hash() {
+    echo -n "$1" | sha256sum | cut -d' ' -f1
+}
+
 # Get or create collection ID
 get_collection_id() {
     # Check state file first
@@ -137,19 +142,20 @@ get_collection_id() {
     echo "$collection_id"
 }
 
-# Get document ID from state
-get_document_id() {
+# Get document info from state (id and hash)
+get_document_info() {
     local path="$1"
 
     if [[ -f "$STATE_FILE" ]]; then
-        jq -r --arg path "$path" '.documents[$path].id // empty' "$STATE_FILE" 2>/dev/null
+        jq -r --arg path "$path" '.documents[$path] | "\(.id // "")\t\(.hash // "")"' "$STATE_FILE" 2>/dev/null
     fi
 }
 
-# Save document ID to state
-save_document_id() {
+# Save document info to state (id and hash)
+save_document_info() {
     local path="$1"
     local doc_id="$2"
+    local hash="$3"
 
     if [[ ! -f "$STATE_FILE" ]]; then
         echo '{"documents": {}}' > "$STATE_FILE"
@@ -157,32 +163,115 @@ save_document_id() {
 
     local tmp
     tmp=$(mktemp)
-    jq --arg path "$path" --arg id "$doc_id" '.documents[$path] = {"id": $id}' "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+    jq --arg path "$path" --arg id "$doc_id" --arg hash "$hash" \
+        '.documents[$path] = {"id": $id, "hash": $hash}' "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
 }
 
-# Convert file path to title
-path_to_title() {
-    local path="$1"
-    local name
-    name=$(basename "$path" .md)
-
-    # Replace dashes and underscores with spaces, then title case
+# Convert filename to title case
+filename_to_title() {
+    local filename="$1"
+    # Remove .md extension
+    local name="${filename%.md}"
+    # Replace underscores and dashes with spaces, then title case
     echo "$name" | sed 's/[-_]/ /g' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2))}1'
 }
 
-# Get title for a document from config or generate from path
-get_doc_title() {
+# Generate hierarchical title for a document
+generate_title() {
     local path="$1"
 
-    # Check config for explicit title
-    local title
-    title=$(jq -r --arg path "$path" '.documents[] | select(.path == $path) | .title // empty' "$CONFIG_FILE" 2>/dev/null)
-
-    if [[ -n "$title" ]]; then
-        echo "$title"
-    else
-        path_to_title "$path"
+    # Check for title override first
+    local override
+    override=$(jq -r --arg path "$path" '.titleOverrides[$path] // empty' "$CONFIG_FILE" 2>/dev/null)
+    if [[ -n "$override" ]]; then
+        echo "$override"
+        return 0
     fi
+
+    # Get directory and filename
+    local dir filename base_title
+    dir=$(dirname "$path")
+    filename=$(basename "$path")
+    base_title=$(filename_to_title "$filename")
+
+    # If file is in root, just use the base title
+    if [[ "$dir" == "." ]]; then
+        echo "$base_title"
+        return 0
+    fi
+
+    # Check for category prefix
+    local first_dir category_prefix
+    first_dir="${dir%%/*}"
+    category_prefix=$(jq -r --arg dir "$first_dir" '.categoryPrefixes[$dir] // empty' "$CONFIG_FILE" 2>/dev/null)
+
+    if [[ -n "$category_prefix" ]]; then
+        echo "${category_prefix}: ${base_title}"
+    else
+        # Use directory name as prefix, title cased
+        local dir_title
+        dir_title=$(filename_to_title "$first_dir")
+        echo "${dir_title}: ${base_title}"
+    fi
+}
+
+# Find all files matching patterns
+find_matching_files() {
+    local patterns exclude_patterns
+    patterns=$(jq -r '.patterns[]' "$CONFIG_FILE" 2>/dev/null)
+    exclude_patterns=$(jq -r '.excludePatterns[]' "$CONFIG_FILE" 2>/dev/null || echo "")
+
+    local all_files=()
+
+    # Process each pattern
+    while IFS= read -r pattern; do
+        [[ -z "$pattern" ]] && continue
+
+        # Use find with glob pattern (works with bash)
+        while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            [[ -f "$REPO_ROOT/$file" ]] && all_files+=("$file")
+        done < <(cd "$REPO_ROOT" && find . -type f -path "./$pattern" 2>/dev/null | sed 's|^\./||')
+
+        # Also try simple glob expansion for non-recursive patterns
+        while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            [[ -f "$REPO_ROOT/$file" ]] && all_files+=("$file")
+        done < <(cd "$REPO_ROOT" && ls -1 $pattern 2>/dev/null || true)
+
+    done <<< "$patterns"
+
+    # Remove duplicates and apply exclusions
+    local unique_files=()
+    local seen=()
+
+    for file in "${all_files[@]}"; do
+        # Skip if already seen
+        local is_seen=false
+        for s in "${seen[@]:-}"; do
+            [[ "$s" == "$file" ]] && is_seen=true && break
+        done
+        [[ "$is_seen" == "true" ]] && continue
+        seen+=("$file")
+
+        # Check against exclude patterns
+        local excluded=false
+        while IFS= read -r exclude; do
+            [[ -z "$exclude" ]] && continue
+            # Simple glob matching
+            if [[ "$file" == $exclude ]] || [[ "$file" == *"$exclude"* ]]; then
+                excluded=true
+                break
+            fi
+        done <<< "$exclude_patterns"
+
+        [[ "$excluded" == "true" ]] && continue
+
+        unique_files+=("$file")
+    done
+
+    # Print unique files
+    printf '%s\n' "${unique_files[@]}"
 }
 
 # Escape content for JSON
@@ -204,13 +293,27 @@ sync_document() {
     fi
 
     local title
-    title=$(get_doc_title "$path")
+    title=$(generate_title "$path")
 
     local content
     content=$(cat "$full_path")
 
-    local doc_id
-    doc_id=$(get_document_id "$path")
+    # Compute hash of local content
+    local local_hash
+    local_hash=$(compute_hash "$content")
+
+    # Get stored document info
+    local doc_info
+    doc_info=$(get_document_info "$path")
+    local doc_id stored_hash
+    doc_id=$(echo "$doc_info" | cut -f1)
+    stored_hash=$(echo "$doc_info" | cut -f2)
+
+    # Check if content has changed
+    if [[ -n "$doc_id" ]] && [[ "$stored_hash" == "$local_hash" ]] && [[ "${FORCE_FULL_SYNC:-}" != "true" ]]; then
+        log_skip "$title (unchanged)"
+        return 0
+    fi
 
     # Escape content for JSON
     local escaped_content
@@ -218,7 +321,7 @@ sync_document() {
 
     if [[ -n "$doc_id" ]]; then
         # Update existing document
-        log_info "Updating '$title'..."
+        log_info "Updating '$title' (content changed)..."
 
         local payload
         payload=$(jq -n \
@@ -231,7 +334,8 @@ sync_document() {
         response=$(outline_api "documents.update" "$payload")
 
         if echo "$response" | jq -e '.data.id' > /dev/null 2>&1; then
-            log_info "  ✓ Updated"
+            save_document_info "$path" "$doc_id" "$local_hash"
+            log_info "  Updated: $title"
             return 0
         else
             log_error "  Failed to update"
@@ -239,7 +343,7 @@ sync_document() {
         fi
     else
         # Create new document
-        log_info "Creating '$title'..."
+        log_info "Creating '$title' (new document)..."
 
         local payload
         payload=$(jq -n \
@@ -255,8 +359,8 @@ sync_document() {
         new_id=$(echo "$response" | jq -r '.data.id // empty')
 
         if [[ -n "$new_id" ]]; then
-            save_document_id "$path" "$new_id"
-            log_info "  ✓ Created (ID: ${new_id:0:8}...)"
+            save_document_info "$path" "$new_id" "$local_hash"
+            log_info "  Created: $title (ID: ${new_id:0:8}...)"
             return 0
         else
             log_error "  Failed to create"
@@ -265,50 +369,9 @@ sync_document() {
     fi
 }
 
-# Get list of docs to sync from config
-get_configured_docs() {
-    jq -r '.documents[].path' "$CONFIG_FILE" 2>/dev/null
-}
-
-# Get the previous tag for comparison
-get_previous_tag() {
-    # Find the tag before the current one
-    git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo ""
-}
-
-# Get changed docs since previous tag
-get_changed_docs() {
-    local prev_tag="$1"
-
-    cd "$REPO_ROOT" || return
-
-    # Get all configured docs
-    local configured_docs
-    configured_docs=$(get_configured_docs)
-
-    if [[ -z "$prev_tag" ]] || [[ "${FORCE_FULL_SYNC:-}" == "true" ]]; then
-        log_info "Full sync mode - syncing all configured documents" >&2
-        echo "$configured_docs"
-    else
-        log_info "Incremental sync - finding changes since $prev_tag" >&2
-
-        # Get changed files since previous tag
-        local changed_files
-        changed_files=$(git diff --name-only "$prev_tag" HEAD 2>/dev/null || echo "")
-
-        # Filter to only configured docs that changed
-        for doc in $configured_docs; do
-            if echo "$changed_files" | grep -q "^$doc$"; then
-                echo "$doc"
-            fi
-        done
-    fi
-}
-
 # Main sync function
 sync_to_outline() {
-    log_info "Starting Outline sync (tag-based)"
-    log_info "Version: $OUTLINE_VERSION"
+    log_info "Starting Outline sync (pattern-based with hash comparison)"
     log_info "API URL: $OUTLINE_API_URL"
     log_info "Repository root: $REPO_ROOT"
     echo ""
@@ -317,41 +380,75 @@ sync_to_outline() {
     local collection_id
     collection_id=$(get_collection_id)
     log_info "Collection ID: $collection_id"
+    echo ""
 
-    # Get previous tag for comparison
-    local prev_tag
-    prev_tag=$(get_previous_tag)
-    if [[ -n "$prev_tag" ]]; then
-        log_info "Previous tag: $prev_tag"
-    else
-        log_info "No previous tag found (first release)"
-    fi
+    # Find all matching files
+    log_info "Discovering files from patterns..."
+    local files
+    files=$(find_matching_files)
+
+    local file_count
+    file_count=$(echo "$files" | grep -c . || echo "0")
+    log_info "Found $file_count file(s) matching patterns"
     echo ""
 
     local synced=0
-    local skipped=0
+    local unchanged=0
     local failed=0
 
-    # Process documents
+    # Process all discovered files
     while IFS= read -r doc; do
         [[ -z "$doc" ]] && continue
 
+        local full_path="$REPO_ROOT/$doc"
+        if [[ ! -f "$full_path" ]]; then
+            log_warn "Skipping '$doc' (file not found)"
+            continue
+        fi
+
+        # Get stored hash
+        local doc_info
+        doc_info=$(get_document_info "$doc")
+        local doc_id stored_hash
+        doc_id=$(echo "$doc_info" | cut -f1)
+        stored_hash=$(echo "$doc_info" | cut -f2)
+
+        # Compute local hash
+        local content local_hash
+        content=$(cat "$full_path")
+        local_hash=$(compute_hash "$content")
+
+        # Check if unchanged
+        if [[ -n "$doc_id" ]] && [[ "$stored_hash" == "$local_hash" ]] && [[ "${FORCE_FULL_SYNC:-}" != "true" ]]; then
+            local title
+            title=$(generate_title "$doc")
+            log_skip "$title (unchanged)"
+            unchanged=$((unchanged + 1))
+            continue
+        fi
+
+        # Sync document
         if sync_document "$doc" "$collection_id"; then
             synced=$((synced + 1))
         else
             failed=$((failed + 1))
         fi
-    done < <(get_changed_docs "$prev_tag")
+    done <<< "$files"
 
     echo ""
     log_info "===== Sync Summary ====="
-    log_info "  Version: $OUTLINE_VERSION"
-    log_info "  Synced:  $synced"
-    log_info "  Failed:  $failed"
+    log_info "  Total files:  $file_count"
+    log_info "  Unchanged:    $unchanged (skipped)"
+    log_info "  Synced:       $synced"
+    log_info "  Failed:       $failed"
 
     if [[ $failed -gt 0 ]]; then
         log_warn "Sync completed with errors"
         exit 1
+    fi
+
+    if [[ $unchanged -gt 0 ]] && [[ $synced -eq 0 ]]; then
+        log_info "All documents unchanged - nothing to sync!"
     fi
 
     log_info "Sync completed successfully"

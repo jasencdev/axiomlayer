@@ -2,31 +2,96 @@
   "collectionId": "8524be87-e73d-4482-aaa5-0bfd2a7263a4",
   "documents": {
     "README.md": {
-      "id": "efdbde43-8ff7-4760-bdd9-e9d4aefe1e03"
+      "id": "efdbde43-8ff7-4760-bdd9-e9d4aefe1e03",
+      "hash": "e6945e3cdea9d43d659324437f5fef68d4eb657a901f1462e9c609c04f77a772"
     },
     "docs/APPLICATIONS.md": {
-      "id": "4d53b449-3dd6-4d9f-a099-dcd371f8a314"
+      "id": "4d53b449-3dd6-4d9f-a099-dcd371f8a314",
+      "hash": "34a893020414b5eab4122dde8d8b18ab329a332b9dc5cce2b29fbd0ccc611e20"
     },
     "docs/ARCHITECTURE.md": {
-      "id": "fba40189-ea77-4df7-a200-d074acabc05e"
+      "id": "fba40189-ea77-4df7-a200-d074acabc05e",
+      "hash": "8ad6b9cdab230354be9002f6287a3584ce8e91c4d703d989b76903e62231a653"
     },
     "docs/INFRASTRUCTURE.md": {
-      "id": "3c0b39e5-7821-4644-ad20-7216aeb51ecb"
+      "id": "3c0b39e5-7821-4644-ad20-7216aeb51ecb",
+      "hash": "ab948531a72ae71f555dc646c376bd80be5fd3e2821b210c2dc4cc3ee03fec62"
     },
     "docs/NETWORKING.md": {
-      "id": "3462d292-1e7d-4ebc-ab63-66c4581e44bc"
+      "id": "3462d292-1e7d-4ebc-ab63-66c4581e44bc",
+      "hash": "652eec732b0f749fb02958f848c069315c96e4bacb8ed7f5a2323eed24b03166"
     },
     "docs/OUTLINE_SYNC_PLAN.md": {
-      "id": "388f66ab-091d-4065-95d0-981c2eddb752"
+      "id": "388f66ab-091d-4065-95d0-981c2eddb752",
+      "hash": "fd7707709cfe77935c3e3e73e99f7e4e030849e661a4358b871904871bdaebd8"
     },
     "docs/RUNBOOKS.md": {
-      "id": "64a0610c-c577-43fb-8fcb-41b23b02e4f6"
+      "id": "64a0610c-c577-43fb-8fcb-41b23b02e4f6",
+      "hash": "4ce1df0331fc9e671c9fc50227dbf72db0dbb8d2f375649d7cd455e2ca27525a"
     },
     "docs/SECRETS.md": {
-      "id": "2b2bfbfe-3d1f-46bd-84a3-38b9db0c7249"
+      "id": "2b2bfbfe-3d1f-46bd-84a3-38b9db0c7249",
+      "hash": "78fdac349cd79cce0d02b7d2584e5b3fe7f96d2d0b8dda860ef539849168238c"
     },
     "docs/TROUBLESHOOTING.md": {
-      "id": "b0cac0e1-9bba-4a0b-bdd2-bc285b3fc556"
+      "id": "b0cac0e1-9bba-4a0b-bdd2-bc285b3fc556",
+      "hash": "dbde174b920d004b2a2b08e8e37c6ff5a8ea527422d63da16ff743e708888181"
+    },
+    "CONTRIBUTING.md": {
+      "id": "90588403-71b2-4cb3-a51e-0f42df938ef8",
+      "hash": "d51fd2366d32a077107c39b0fa7bcf401cd68ce1d2107130d1d70b49ee71a624"
+    },
+    "docs/REPOSITORY_INVENTORY.md": {
+      "id": "caf8c41a-0485-405b-9701-f0c13e970ccf",
+      "hash": "5a58f70bc684117be9a4cc50cef10cd7169b8a11b7f34ada3b3f930e4d078e81"
+    },
+    "docs/CI_CD_PIPELINE.md": {
+      "id": "31dfb69c-f945-43f9-a86e-7b83d431fee4",
+      "hash": "f8341dc4f87ba606fe73160ee7728f1071a5c3dcd8804819dc49ae48524698c4"
+    },
+    "docs/DOCUMENTATION_AUDIT_REPORT.md": {
+      "id": "36dc1bd6-3555-40b3-b1e2-f462ab501de5",
+      "hash": "8c9fd4f62e416a818801ada01585796ada006c157a2766217710580832fb9c1a"
+    },
+    "scripts/README.md": {
+      "id": "ffb603d9-248f-43a5-9ea5-22b01f83ff6a",
+      "hash": "c42616ddce318f7dee8d0a7a7b4c966de80b347b8c7e6089428b5c6acb620bf7"
+    },
+    "tests/README.md": {
+      "id": "c0bc8699-bde5-4960-8ac9-66fb14a6bb3b",
+      "hash": "f9d08fd4f8905a710db74ba1d0cf488a6d987c9f5ac7ebe822afd21c04a00283"
+    },
+    "CLAUDE.md": {
+      "id": "968f2423-615a-4bc3-aee8-17a02aa9088d",
+      "hash": "be9948f88ec354e707ea07ee994f06b2f211cc8299adda5964fe0f02f58cc5bf"
+    },
+    "docs/encrypted-backup-recovery.md": {
+      "id": "543eb664-3b08-439c-bc3a-1e1aac61bf35",
+      "hash": "9548a7a3f3b35ffea1f4a81810ac96fb498667db99db4c00a3004f6f7c9f3333"
+    },
+    "docs/DISASTER_RECOVERY.md": {
+      "id": "1d7b2915-ad2b-453e-b9ef-7b8276a11437",
+      "hash": "5bd4d3c186c49e802b7f3c592e4854e96e2e654c35ae609ca4143c8e99154d55"
+    },
+    "docs/developer-guide.md": {
+      "id": "fe59b684-7e94-4278-9644-78da7a93a0c0",
+      "hash": "fca8aa0c39b3ed2503b3f7524b25aca1a9378225ec6959ce1c9e5639a14c02eb"
+    },
+    "docs/BACKUPS.md": {
+      "id": "a761fa52-aed7-4277-a8d0-1b6f7ebdb314",
+      "hash": "ba9c956e1dba85b91bab32df8c8f4968171ceffbcbd3f60a2f7103b50470ecb3"
+    },
+    "docs/RAG_KNOWLEDGE_BASE.md": {
+      "id": "7a99952b-e4c7-431b-90bc-4377be6a643a",
+      "hash": "776369b5ac43c5a863dc403c9f1d21bf65a6aacd40109b36019dbffe8f1079fd"
+    },
+    "docs/rag-sync-migration.md": {
+      "id": "83df524f-57b3-4b39-9163-79052abd8bbb",
+      "hash": "04be340405b5004c569d3a2117fc7507bfb389f921576b3bc37bec510f2459e4"
+    },
+    "docs/APP-DEPLOYMENT-WORKFLOW.md": {
+      "id": "d519e444-e727-406f-8dcc-c361a5d52e2c",
+      "hash": "9393df4aa789de73a91185c4e30ed48c18d5cd21c21cc510e7760e5d184f4af1"
     }
   }
 }

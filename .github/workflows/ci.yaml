@@ -3,8 +3,6 @@ name: CI
 on:
   push:
     branches: [main]
-    tags:
-      - 'v*'  # Trigger on version tags for RAG/Outline sync
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -364,26 +362,20 @@ jobs:
       - name: Run network policy tests
         run: ./tests/test-network-policies.sh
 
+  # Outline sync - Syncs markdown docs to Outline wiki using hash-based deduplication
   outline-sync:
     name: Outline Sync
     runs-on: [self-hosted, homelab]
-    # Only run on version tag pushes (v*)
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [ci-passed]
+    # Run on main push after ArgoCD sync, or on manual trigger
+    if: always() && needs.ci-passed.result == 'success' && ((github.ref == 'refs/heads/main' && github.event_name == 'push') || github.event_name == 'workflow_dispatch')
     env:
       OUTLINE_API_TOKEN: ${{ secrets.OUTLINE_API_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 0  # Need full history for tag comparison
-
-      - name: Get version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
       - name: Sync docs to Outline
-        env:
-          OUTLINE_VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           if [ -z "$OUTLINE_API_TOKEN" ]; then
             echo "OUTLINE_API_TOKEN not set; skipping Outline sync."
@@ -391,56 +383,49 @@ jobs:
           fi
           ./scripts/sync-outline.sh
 
-  # RAG sync disabled - Open WebUI knowledge base sync temporarily turned off
-  # rag-sync:
-  #   name: RAG Sync
-  #   runs-on: [self-hosted, homelab]
-  #   # Only run on version tag pushes (v*)
-  #   if: startsWith(github.ref, 'refs/tags/v')
-  #   env:
-  #     OPEN_WEBUI_API_KEY: ${{ secrets.OPEN_WEBUI_API_KEY }}
-  #     OPEN_WEBUI_KNOWLEDGE_ID: ${{ secrets.OPEN_WEBUI_KNOWLEDGE_ID }}
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v6
-  #       with:
-  #         fetch-depth: 0  # Need full history for tag comparison
-  #
-  #     - name: Get version from tag
-  #       id: version
-  #       run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-  #
-  #     - name: Install kubectl
-  #       run: |
-  #         if ! command -v kubectl &> /dev/null; then
-  #           ARCH=$(uname -m)
-  #           case $ARCH in
-  #             x86_64) ARCH="amd64" ;;
-  #             aarch64) ARCH="arm64" ;;
-  #             armv7l) ARCH="arm" ;;
-  #           esac
-  #           OS=$(uname -s)
-  #           case $OS in
-  #             Linux) OS="linux" ;;
-  #             Darwin) OS="darwin" ;;
-  #             *) echo "Unsupported OS: $OS"; exit 1 ;;
-  #           esac
-  #           curl -fsSLo kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/${OS}/${ARCH}/kubectl"
-  #           chmod +x kubectl
-  #           sudo mv kubectl /usr/local/bin/
-  #         fi
-  #         kubectl version --client
-  #
-  #     - name: Sync repo to Open WebUI RAG
-  #       env:
-  #         RAG_VERSION: ${{ steps.version.outputs.VERSION }}
-  #       run: |
-  #         if [ -z "$OPEN_WEBUI_API_KEY" ]; then
-  #           echo "OPEN_WEBUI_API_KEY not set; skipping RAG sync."
-  #           exit 0
-  #         fi
-  #         if [ -z "$OPEN_WEBUI_KNOWLEDGE_ID" ]; then
-  #           echo "OPEN_WEBUI_KNOWLEDGE_ID not set; skipping RAG sync."
-  #           exit 0
-  #         fi
-  #         ./scripts/sync-rag.sh
+  # RAG sync - Syncs repo files to Open WebUI knowledge base using hash-based deduplication
+  rag-sync:
+    name: RAG Sync
+    runs-on: [self-hosted, homelab]
+    needs: [ci-passed]
+    # Run on main push after ArgoCD sync, or on manual trigger
+    if: always() && needs.ci-passed.result == 'success' && ((github.ref == 'refs/heads/main' && github.event_name == 'push') || github.event_name == 'workflow_dispatch')
+    env:
+      OPEN_WEBUI_API_KEY: ${{ secrets.OPEN_WEBUI_API_KEY }}
+      OPEN_WEBUI_KNOWLEDGE_ID: ${{ secrets.OPEN_WEBUI_KNOWLEDGE_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install kubectl
+        run: |
+          if ! command -v kubectl &> /dev/null; then
+            ARCH=$(uname -m)
+            case $ARCH in
+              x86_64) ARCH="amd64" ;;
+              aarch64) ARCH="arm64" ;;
+              armv7l) ARCH="arm" ;;
+            esac
+            OS=$(uname -s)
+            case $OS in
+              Linux) OS="linux" ;;
+              Darwin) OS="darwin" ;;
+              *) echo "Unsupported OS: $OS"; exit 1 ;;
+            esac
+            curl -fsSLo kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/${OS}/${ARCH}/kubectl"
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin/
+          fi
+          kubectl version --client
+
+      - name: Sync repo to Open WebUI RAG
+        run: |
+          if [ -z "$OPEN_WEBUI_API_KEY" ]; then
+            echo "OPEN_WEBUI_API_KEY not set; skipping RAG sync."
+            exit 0
+          fi
+          if [ -z "$OPEN_WEBUI_KNOWLEDGE_ID" ]; then
+            echo "OPEN_WEBUI_KNOWLEDGE_ID not set; skipping RAG sync."
+            exit 0
+          fi
+          ./scripts/sync-rag.sh

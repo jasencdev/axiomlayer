@@ -64,7 +64,6 @@ homelab-gitops/
 │   ├── external-dns/         # DNS management (Cloudflare)
 │   ├── longhorn/             # Distributed storage
 │   ├── monitoring/           # Prometheus/Grafana extras (OIDC, certs)
-│   ├── nfs-proxy/            # NFS access for Longhorn
 │   ├── open-webui/           # AI chat interface
 │   └── sealed-secrets/       # Sealed Secrets controller
 ├── tests/                    # Test suite
@@ -96,8 +95,9 @@ homelab-gitops/
 | Logging | Loki + Promtail | Log aggregation |
 | Network | Tailscale | Mesh VPN |
 | AI/LLM | Open WebUI + Ollama | Chat interface |
-| Backups | CronJob + NFS | Daily database backups to NAS |
+| Backups | Longhorn + CronJob | Volume backups + SQL dumps to NAS |
 | Secrets | Sealed Secrets | Encrypted secrets in Git |
+| Doc Sync | scripts/sync-*.sh | Hash-based sync to Outline + RAG |
 
 ## Applications
 
@@ -130,12 +130,29 @@ CloudNativePG manages PostgreSQL instances:
 
 ## Automated Backups
 
-Daily backup CronJob runs at 3 AM:
-- **Location**: `infrastructure/backups/backup-cronjob.yaml`
-- **Namespace**: longhorn-system (for NFS access)
-- **Target**: Unifi NAS at 192.168.1.234
-- **Databases backed up**: Authentik, Outline
-- **Retention**: 7 days
+Two-layer backup strategy protects all data:
+
+### Layer 1: Longhorn Volume Backups (All PVCs)
+
+| Job | Schedule | Retention | Type |
+|-----|----------|-----------|------|
+| daily-snapshot | 2:00 AM daily | 7 days | Local (in-cluster) |
+| weekly-snapshot | 3:00 AM Sunday | 4 weeks | Local (in-cluster) |
+| daily-backup | 2:30 AM daily | 7 days | Remote (to NAS) |
+| weekly-backup | 3:30 AM Sunday | 4 weeks | Remote (to NAS) |
+
+- **Location**: `infrastructure/backups/longhorn-recurring-jobs.yaml`
+- **Backup Target**: `nfs://192.168.1.234:/var/nfs/shared/Shared_Drive_Example/k8s-backup`
+- **Covers**: All application data, databases, logs
+
+### Layer 2: Database SQL Dumps (Portable)
+
+| Setting | Value |
+|---------|-------|
+| Schedule | 4:00 AM daily |
+| Databases | Authentik (critical), Outline |
+| Retention | 7 days |
+| Location | `infrastructure/backups/backup-cronjob.yaml` |
 
 ```bash
 # Test backup manually
@@ -143,7 +160,12 @@ kubectl create job --from=cronjob/homelab-backup homelab-backup-test -n longhorn
 
 # View backup logs
 kubectl logs -n longhorn-system -l job-name=homelab-backup-test
+
+# Check Longhorn backups
+kubectl get backups -n longhorn-system --sort-by=.metadata.creationTimestamp | tail -10
 ```
+
+**Full documentation**: See `docs/BACKUPS.md` for complete backup and recovery procedures.
 
 ## CI/CD Pipeline
 
@@ -164,20 +186,20 @@ kubectl logs -n longhorn-system -l job-name=homelab-backup-test
 
 ### Documentation Sync
 
-CI automatically syncs documentation on push to main:
+CI automatically syncs documentation on every push to main using **hash-based smart sync**:
 
 **Outline Sync** (`scripts/sync-outline.sh`):
 - Syncs markdown docs to Outline wiki at docs.lab.axiomlayer.com
 - Config: `outline_sync/config.json` defines which files to sync
-- State: `outline_sync/state.json` tracks document IDs
-- Marker: `.outline-sync-commit` tracks last synced commit
+- State: `outline_sync/state.json` tracks document IDs + content hashes
+- **Smart sync**: Compares SHA256 hashes, only updates changed documents
 
 **RAG Sync** (`scripts/sync-rag.sh`):
 - Syncs repo files to Open WebUI knowledge base for AI chat
 - Patterns: `*.md`, `apps/**/*.yaml`, `infrastructure/**/*.yaml`, `.github/workflows/*.yaml`
 - Excludes: `*sealed-secret*`, `*.env*`, `*AGENTS.md*`
-- Marker: `.rag-sync-commit` tracks last synced commit
-- Logic: if file not in KB → upload; if file in KB and changed → update; else skip
+- **Smart sync**: Queries KB for existing file hashes, only uploads new/changed files
+- Avoids wasteful embedding of unchanged content
 
 ### Running Tests Locally
 ```bash
@@ -460,22 +482,28 @@ SELECT name, slug FROM authentik_core_application;
 SELECT id, name FROM authentik_flows_flow WHERE slug LIKE '%authorization%';
 ```
 
-## NFS and Storage
+## Storage and NAS
 
-### Longhorn
+### Longhorn (Distributed Block Storage)
 - Default StorageClass for PVCs
-- Distributed across worker nodes
+- 2 replicas per volume (for node failure tolerance)
 - UI at longhorn.lab.axiomlayer.com
+- Backup target: NAS at 192.168.1.234
 
-### NFS Proxy
-- Runs on neko node (nodeSelector)
-- Proxies NFS from Unifi NAS (192.168.1.234)
-- Used by backup CronJob
+### NAS Direct Access
+All cluster nodes mount the UniFi NAS directly (no proxy needed):
 
-### Direct NAS Access
-```
-Server: 192.168.1.234
-Path: /volume/e8e70d24-82e0-45f1-8ef6-f8ca399ad2d6/.srv/.unifi-drive/Shared_Drive_Example/.data
+| Property | Value |
+|----------|-------|
+| NAS IP | 192.168.1.234 |
+| NFS Path | /var/nfs/shared/Shared_Drive_Example/k8s-backup |
+| Protocol | NFSv3 (NFSv4 not supported by UNAS) |
+| Allowed IPs | 192.168.1.103, 192.168.1.117, 192.168.1.167, 192.168.1.49, 192.168.1.94 |
+
+```bash
+# Test NFS mount from pod
+kubectl run nfs-test --rm -it --image=busybox --restart=Never -- sh -c \
+  "mount -t nfs -o nfsvers=3 192.168.1.234:/var/nfs/shared/Shared_Drive_Example/k8s-backup /mnt && ls /mnt"
 ```
 
 ## Monitoring and Logging
@@ -562,6 +590,6 @@ Full documentation in Outline at https://docs.lab.axiomlayer.com:
 - Ollama for embeddings runs on panther (RTX 3050 Ti) via Tailscale at 100.79.124.94:11434
 - Open WebUI uses granite4:3b model for RAG embeddings
 - GitHub Actions runners have read-only cluster RBAC for tests
-- Backup jobs run on neko node (nodeSelector for NFS access)
+- Backup CronJob runs from any node (direct NAS access)
 - panther is the primary worker node for most workloads
 - Sealed Secrets controller is GitOps-managed in infrastructure/sealed-secrets/

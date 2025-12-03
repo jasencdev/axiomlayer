@@ -25,8 +25,10 @@ declare -a TEST_RESULTS=()
 # Backup configuration
 BACKUP_NAMESPACE="longhorn-system"
 BACKUP_CRONJOB="homelab-backup"
-NFS_MOUNT_PATH="/mnt/nas-backup"
+NAS_IP="192.168.1.234"
+NAS_PATH="/var/nfs/shared/Shared_Drive_Example/k8s-backup"
 BACKUP_DATABASES=("authentik" "outline")
+LONGHORN_RECURRING_JOBS=("daily-snapshot" "weekly-snapshot" "daily-backup" "weekly-backup")
 
 print_header() {
     echo -e "\n${BLUE}═══════════════════════════════════════════════════════════════${NC}"
@@ -233,6 +235,186 @@ test_database_connectivity() {
     done
 }
 
+# Test: Longhorn recurring backup jobs
+test_longhorn_recurring_jobs() {
+    print_section "Longhorn Recurring Backup Job Tests"
+
+    # Check recurring jobs exist
+    for job in "${LONGHORN_RECURRING_JOBS[@]}"; do
+        if kubectl get recurringjob "$job" -n "$BACKUP_NAMESPACE" &> /dev/null; then
+            pass "Longhorn recurring job '$job' exists"
+
+            # Check job configuration
+            local task
+            task=$(kubectl get recurringjob "$job" -n "$BACKUP_NAMESPACE" -o jsonpath='{.spec.task}')
+            local cron
+            cron=$(kubectl get recurringjob "$job" -n "$BACKUP_NAMESPACE" -o jsonpath='{.spec.cron}')
+            local retain
+            retain=$(kubectl get recurringjob "$job" -n "$BACKUP_NAMESPACE" -o jsonpath='{.spec.retain}')
+
+            if [[ -n "$cron" ]]; then
+                pass "Job '$job' has schedule: $cron (task: $task, retain: $retain)"
+            else
+                fail "Job '$job' has no schedule configured"
+            fi
+        else
+            fail "Longhorn recurring job '$job' not found"
+        fi
+    done
+}
+
+# Test: Longhorn backup target configuration
+test_longhorn_backup_target() {
+    print_section "Longhorn Backup Target Tests"
+
+    # Check backup target setting exists
+    local backup_target
+    backup_target=$(kubectl get settings backup-target -n "$BACKUP_NAMESPACE" -o jsonpath='{.value}' 2>/dev/null)
+
+    if [[ -n "$backup_target" ]]; then
+        pass "Longhorn backup target configured: $backup_target"
+
+        # Verify it points to NAS
+        if echo "$backup_target" | grep -q "$NAS_IP"; then
+            pass "Backup target points to NAS ($NAS_IP)"
+        else
+            fail "Backup target does not point to expected NAS ($NAS_IP)"
+        fi
+
+        # Check NFS options include nfsvers=3
+        if echo "$backup_target" | grep -qiE "nfsvers=3|nfsOptions"; then
+            pass "Backup target includes NFS version options"
+        else
+            info "Backup target may need NFS options for compatibility"
+        fi
+    else
+        fail "Longhorn backup target not configured"
+    fi
+
+    # Check backup target status
+    local backup_target_available
+    backup_target_available=$(kubectl get settings backup-target -n "$BACKUP_NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null)
+
+    # If we can't get status via settings, try via backuptargets CR
+    if [[ -z "$backup_target_available" ]]; then
+        backup_target_available=$(kubectl get backuptargets -n "$BACKUP_NAMESPACE" default -o jsonpath='{.status.available}' 2>/dev/null)
+    fi
+
+    if [[ "$backup_target_available" == "true" ]] || [[ "$backup_target_available" == "True" ]]; then
+        pass "Longhorn backup target is available"
+    else
+        info "Could not verify backup target availability status"
+    fi
+}
+
+# Test: Recent Longhorn backups exist
+test_longhorn_recent_backups() {
+    print_section "Longhorn Backup History Tests"
+
+    # Get count of backups
+    local backup_count
+    backup_count=$(kubectl get backups -n "$BACKUP_NAMESPACE" -o name 2>/dev/null | wc -l)
+
+    if [[ "$backup_count" -gt 0 ]]; then
+        pass "Found $backup_count Longhorn backup(s)"
+
+        # Check for recent backups (within last 48 hours)
+        local recent_backups
+        recent_backups=$(kubectl get backups -n "$BACKUP_NAMESPACE" \
+            --sort-by=.metadata.creationTimestamp \
+            -o jsonpath='{.items[-5:].metadata.creationTimestamp}' 2>/dev/null)
+
+        if [[ -n "$recent_backups" ]]; then
+            local most_recent
+            most_recent=$(echo "$recent_backups" | tr ' ' '\n' | tail -1)
+            pass "Most recent backup: $most_recent"
+
+            # Check if within 48 hours
+            local backup_epoch
+            backup_epoch=$(date -d "$most_recent" +%s 2>/dev/null || echo "0")
+            local now_epoch
+            now_epoch=$(date +%s)
+            local hours_ago=$(( (now_epoch - backup_epoch) / 3600 ))
+
+            if [[ "$hours_ago" -lt 48 ]]; then
+                pass "Recent backup is $hours_ago hours old (within 48h threshold)"
+            else
+                fail "Most recent backup is $hours_ago hours old (exceeds 48h threshold)"
+            fi
+        fi
+
+        # Check backup completion status (sample recent ones)
+        local completed_backups
+        completed_backups=$(kubectl get backups -n "$BACKUP_NAMESPACE" \
+            -o jsonpath='{range .items[*]}{.status.state}{"\n"}{end}' 2>/dev/null | grep -c "Completed" || echo "0")
+
+        if [[ "$completed_backups" -gt 0 ]]; then
+            pass "Found $completed_backups completed backup(s)"
+        else
+            info "No backups with 'Completed' state found"
+        fi
+    else
+        fail "No Longhorn backups found - backups may not be running"
+    fi
+
+    # Check for backup volumes (volumes that have been backed up)
+    local backup_volume_count
+    backup_volume_count=$(kubectl get backupvolumes -n "$BACKUP_NAMESPACE" -o name 2>/dev/null | wc -l)
+
+    if [[ "$backup_volume_count" -gt 0 ]]; then
+        pass "Found $backup_volume_count volume(s) with backups"
+    else
+        fail "No backup volumes found - no volumes have been backed up"
+    fi
+}
+
+# Test: Longhorn volume health (affects backup reliability)
+test_longhorn_volume_health() {
+    print_section "Longhorn Volume Health Tests"
+
+    # Get all volumes
+    local total_volumes
+    total_volumes=$(kubectl get volumes -n "$BACKUP_NAMESPACE" -o name 2>/dev/null | wc -l)
+
+    if [[ "$total_volumes" -eq 0 ]]; then
+        skip "No Longhorn volumes found"
+        return
+    fi
+
+    pass "Found $total_volumes Longhorn volume(s)"
+
+    # Check for healthy volumes
+    local healthy_volumes
+    healthy_volumes=$(kubectl get volumes -n "$BACKUP_NAMESPACE" \
+        -o jsonpath='{range .items[*]}{.status.robustness}{"\n"}{end}' 2>/dev/null | grep -c "healthy" || echo "0")
+
+    if [[ "$healthy_volumes" -eq "$total_volumes" ]]; then
+        pass "All $healthy_volumes volumes are healthy"
+    elif [[ "$healthy_volumes" -gt 0 ]]; then
+        fail "Only $healthy_volumes of $total_volumes volumes are healthy"
+    else
+        fail "No healthy volumes found"
+    fi
+
+    # Check for degraded volumes
+    local degraded_volumes
+    degraded_volumes=$(kubectl get volumes -n "$BACKUP_NAMESPACE" \
+        -o jsonpath='{range .items[*]}{.status.robustness}{"\n"}{end}' 2>/dev/null | grep -c "degraded" || echo "0")
+
+    if [[ "$degraded_volumes" -gt 0 ]]; then
+        fail "Found $degraded_volumes degraded volume(s) - backup reliability affected"
+    fi
+
+    # Check for faulted volumes
+    local faulted_volumes
+    faulted_volumes=$(kubectl get volumes -n "$BACKUP_NAMESPACE" \
+        -o jsonpath='{range .items[*]}{.status.robustness}{"\n"}{end}' 2>/dev/null | grep -c "faulted" || echo "0")
+
+    if [[ "$faulted_volumes" -gt 0 ]]; then
+        fail "Found $faulted_volumes faulted volume(s) - CRITICAL: data at risk"
+    fi
+}
+
 # Test 4: Trigger a test backup and verify execution
 test_backup_execution() {
     print_section "Backup Execution Tests"
@@ -308,7 +490,7 @@ test_backup_files() {
 
     info "Creating temporary pod to verify backup files..."
 
-    # Create a test pod that mounts the NFS volume
+    # Create a test pod that mounts the NFS volume directly from NAS
     cat <<EOF | kubectl apply -f - &> /dev/null
 apiVersion: v1
 kind: Pod
@@ -318,8 +500,6 @@ metadata:
   labels:
     app.kubernetes.io/name: backup-verify
 spec:
-  nodeSelector:
-    kubernetes.io/hostname: neko
   containers:
   - name: verify
     image: busybox:1.36
@@ -331,8 +511,8 @@ spec:
   volumes:
   - name: nfs-backup
     nfs:
-      server: nfs-proxy.nfs-proxy.svc.cluster.local
-      path: /k8s-backup
+      server: $NAS_IP
+      path: $NAS_PATH
   restartPolicy: Never
   terminationGracePeriodSeconds: 5
 EOF
@@ -517,9 +697,17 @@ main() {
     print_header "Backup and Restore Verification Tests"
 
     check_prerequisites
+
+    # SQL Dump CronJob tests
     test_cronjob_configuration
     test_last_backup_status
     test_database_connectivity
+
+    # Longhorn backup tests
+    test_longhorn_recurring_jobs
+    test_longhorn_backup_target
+    test_longhorn_recent_backups
+    test_longhorn_volume_health
 
     # Optional: Run backup execution test (can be slow)
     if [[ "${RUN_BACKUP_TEST:-false}" == "true" ]]; then

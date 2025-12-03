@@ -461,17 +461,51 @@ ssh {node} sudo /usr/local/bin/k3s-agent-uninstall.sh
 
 ## Backup and Restore
 
+For comprehensive backup documentation, see **[docs/BACKUPS.md](BACKUPS.md)**.
+
 ### Backup Architecture
 
 ```
-Longhorn Volumes → NFS Proxy (in-cluster) → UNAS NFS Share
-                   10.43.37.240:/          192.168.1.234:/.../.data/k8s-backup
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         BACKUP FLOW                                      │
+│                                                                          │
+│  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐   │
+│  │ Longhorn Volume │────▶│  Local Snapshot │     │   2:00 AM       │   │
+│  │    (any node)   │     │  (cluster nodes)│     │   7 day retain  │   │
+│  └─────────────────┘     └─────────────────┘     └─────────────────┘   │
+│           │                                                              │
+│           │              ┌─────────────────┐     ┌─────────────────┐   │
+│           └─────────────▶│ Remote Backup   │────▶│   UniFi NAS     │   │
+│                          │  (2:30 AM)      │     │ 192.168.1.234   │   │
+│                          └─────────────────┘     └─────────────────┘   │
+│                                                                          │
+│  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐   │
+│  │ PostgreSQL DBs  │────▶│   pg_dump       │────▶│   UniFi NAS     │   │
+│  │  (CNPG pods)    │     │   (4:00 AM)     │     │   SQL files     │   │
+│  └─────────────────┘     └─────────────────┘     └─────────────────┘   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Backup Target**: `nfs://10.43.37.240:/` (NFS proxy service)
-- **NFS Proxy**: Runs on `neko`, mounts UNAS and re-exports `/data/k8s-backup`
-- **Schedule**: Daily at 2 AM UTC, retains 7 backups
-- **Compression**: LZ4
+### Backup Schedule
+
+| Job | Type | Schedule | Retention | Target |
+|-----|------|----------|-----------|--------|
+| daily-snapshot | Longhorn snapshot | 2:00 AM daily | 7 | Cluster nodes |
+| weekly-snapshot | Longhorn snapshot | 3:00 AM Sunday | 4 | Cluster nodes |
+| daily-backup | Longhorn backup | 2:30 AM daily | 7 | NAS |
+| weekly-backup | Longhorn backup | 3:30 AM Sunday | 4 | NAS |
+| homelab-backup | SQL dumps | 4:00 AM daily | 7 | NAS |
+
+### Backup Target
+
+All nodes can mount the NAS directly (no proxy needed):
+
+| Property | Value |
+|----------|-------|
+| NAS IP | 192.168.1.234 |
+| NFS Path | /var/nfs/shared/Shared_Drive_Example/k8s-backup |
+| Protocol | NFSv3 |
 
 ### Volume Reference
 
@@ -500,20 +534,24 @@ kubectl get volumes -n longhorn-system -o json | \
 ### Check Backup Status
 
 ```bash
-# List all backup volumes
-kubectl get backupvolumes -n longhorn-system
+# Check Longhorn recurring jobs
+kubectl get recurringjobs -n longhorn-system
 
-# List recent backups
+# List recent Longhorn backups
 kubectl get backups -n longhorn-system --sort-by=.metadata.creationTimestamp | tail -20
 
 # Check backup target health
-kubectl get backuptarget -n longhorn-system default -o yaml
+kubectl get settings backup-target -n longhorn-system -o jsonpath='{.value}'
 
-# Verify NFS mount is working
-kubectl exec -n nfs-proxy deploy/nfs-proxy -- ls -la /data/k8s-backup/backupstore/volumes/
+# Check SQL dump CronJob
+kubectl get cronjob homelab-backup -n longhorn-system
 
-# Check backup size
-kubectl exec -n nfs-proxy deploy/nfs-proxy -- du -sh /data/k8s-backup/backupstore/
+# Last successful SQL backup
+kubectl get cronjob homelab-backup -n longhorn-system -o jsonpath='{.status.lastSuccessfulTime}'
+
+# Test NFS connectivity
+kubectl run nfs-test --rm -it --image=busybox --restart=Never -- sh -c \
+  "mount -t nfs -o nfsvers=3 192.168.1.234:/var/nfs/shared/Shared_Drive_Example/k8s-backup /mnt && ls /mnt"
 ```
 
 ### Manual Longhorn Backup
@@ -810,19 +848,22 @@ kubectl exec -n {namespace} {pod} -- df -h
 kubectl exec -n {namespace} {pod} -- ls -la /path/to/mount
 ```
 
-#### NFS proxy not accessible
+#### NFS mount not accessible
 
 ```bash
-# Check NFS proxy pod
-kubectl get pods -n nfs-proxy
-kubectl logs -n nfs-proxy deploy/nfs-proxy
+# Test NFS connectivity from cluster
+kubectl run nfs-test --rm -it --image=busybox --restart=Never -- sh -c \
+  "mount -t nfs -o nfsvers=3 192.168.1.234:/var/nfs/shared/Shared_Drive_Example/k8s-backup /mnt && ls /mnt"
 
-# Check NFS service
-kubectl get svc -n nfs-proxy
+# Check NAS is reachable
+kubectl run ping-test --rm -it --image=busybox --restart=Never -- ping -c 3 192.168.1.234
 
-# Test NFS mount from another pod
-kubectl run nfs-test --rm -it --image=busybox --restart=Never -- \
-  sh -c "mount -t nfs 10.43.37.240:/ /mnt && ls /mnt/k8s-backup"
+# Check NFS exports from NAS
+ssh neko "showmount -e 192.168.1.234"
+
+# Check if node IP is in NAS allowed list
+# NAS → Settings → NFS → Allowed IPs should include:
+# 192.168.1.103, 192.168.1.117, 192.168.1.167, 192.168.1.49, 192.168.1.94
 ```
 
 ---
