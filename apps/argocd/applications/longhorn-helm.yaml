@@ -31,6 +31,10 @@ spec:
         - .metadata.annotations
         - .metadata.labels
         - .spec.conversion
+    - group: longhorn.io
+      kind: Setting
+      jsonPointers:
+        - /value
   syncPolicy:
     automated:
       prune: true
