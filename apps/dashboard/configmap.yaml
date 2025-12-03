@@ -367,14 +367,14 @@ data:
             <span class="card-url">autom8.lab.axiomlayer.com</span>
           </a>
 
-          <a href="https://pb.lab.axiomlayer.com" class="card" data-url="https://pb.lab.axiomlayer.com" target="_blank">
+          <a href="https://pb.lab.axiomlayer.com/_/" class="card" data-url="https://pb.lab.axiomlayer.com/_/" target="_blank">
             <span class="card-status"></span>
             <div class="card-header">
               <div class="card-icon icon-cyan">PB</div>
               <span class="card-title">PocketBase</span>
             </div>
             <p class="card-desc">Backend as a Service</p>
-            <span class="card-url">pb.lab.axiomlayer.com</span>
+            <span class="card-url">pb.lab.axiomlayer.com/_/</span>
           </a>
 
           <h2 class="section-title">Platform</h2>
@@ -724,7 +724,7 @@ data:
           'plane.lab.axiomlayer.com': 'plane',
           'docs.lab.axiomlayer.com': 'outline',
           'autom8.lab.axiomlayer.com': 'n8n',
-          'pb.lab.axiomlayer.com': 'pocketbase',
+          'pb.lab.axiomlayer.com/_/': 'pocketbase',
           'auth.lab.axiomlayer.com': 'authentik',
           'argocd.lab.axiomlayer.com': 'argocd',
           'grafana.lab.axiomlayer.com': 'monitoring',

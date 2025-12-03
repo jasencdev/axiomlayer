@@ -101,10 +101,17 @@ get_all_matching_files() {
 # Fetch existing files from knowledge base with their hashes
 fetch_kb_files() {
     local result
-    # Pass API key and KB ID via env vars to avoid shell expansion issues
-    result=$(kubectl exec -n open-webui "$POD" --  \
-        env "API_KEY=$OPEN_WEBUI_API_KEY" "KB_ID=$OPEN_WEBUI_KNOWLEDGE_ID" \
-        sh -c 'curl -s -H "Authorization: Bearer $API_KEY" "http://localhost:8080/api/v1/knowledge/$KB_ID"' 2>/dev/null)
+
+    # Base64 encode credentials to avoid shell expansion issues
+    local api_key_b64 kb_id_b64
+    api_key_b64=$(printf '%s' "$OPEN_WEBUI_API_KEY" | base64 -w0)
+    kb_id_b64=$(printf '%s' "$OPEN_WEBUI_KNOWLEDGE_ID" | base64 -w0)
+
+    result=$(kubectl exec -n open-webui "$POD" -- sh -c "
+        API_KEY=\$(echo '$api_key_b64' | base64 -d)
+        KB_ID=\$(echo '$kb_id_b64' | base64 -d)
+        curl -s -H \"Authorization: Bearer \$API_KEY\" \"http://localhost:8080/api/v1/knowledge/\$KB_ID\"
+    " 2>/dev/null)
 
     # Debug: check if we got valid JSON with files
     if [[ -z "$result" ]]; then
@@ -140,18 +147,26 @@ except:
 # Remove file from knowledge base and delete it
 remove_file_from_kb() {
     local file_id="$1"
-    kubectl exec -n open-webui "$POD" -- \
-        env "API_KEY=$OPEN_WEBUI_API_KEY" "KB_ID=$OPEN_WEBUI_KNOWLEDGE_ID" "FILE_ID=$file_id" \
-        sh -c '
+
+    # Base64 encode credentials to avoid shell expansion issues
+    local api_key_b64 kb_id_b64 file_id_b64
+    api_key_b64=$(printf '%s' "$OPEN_WEBUI_API_KEY" | base64 -w0)
+    kb_id_b64=$(printf '%s' "$OPEN_WEBUI_KNOWLEDGE_ID" | base64 -w0)
+    file_id_b64=$(printf '%s' "$file_id" | base64 -w0)
+
+    kubectl exec -n open-webui "$POD" -- sh -c "
+API_KEY=\$(echo '$api_key_b64' | base64 -d)
+KB_ID=\$(echo '$kb_id_b64' | base64 -d)
+FILE_ID=\$(echo '$file_id_b64' | base64 -d)
 # Remove from KB
-curl -s -X POST -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
-    -d "{\"file_id\":\"$FILE_ID\"}" \
-    "http://localhost:8080/api/v1/knowledge/$KB_ID/file/remove" >/dev/null 2>&1
+curl -s -X POST -H \"Authorization: Bearer \$API_KEY\" -H \"Content-Type: application/json\" \
+    -d \"{\\\"file_id\\\":\\\"\$FILE_ID\\\"}\" \
+    \"http://localhost:8080/api/v1/knowledge/\$KB_ID/file/remove\" >/dev/null 2>&1
 # Delete the file
-curl -s -X DELETE -H "Authorization: Bearer $API_KEY" \
-    "http://localhost:8080/api/v1/files/$FILE_ID" >/dev/null 2>&1
-echo "OK"
-' 2>/dev/null
+curl -s -X DELETE -H \"Authorization: Bearer \$API_KEY\" \
+    \"http://localhost:8080/api/v1/files/\$FILE_ID\" >/dev/null 2>&1
+echo 'OK'
+" 2>/dev/null
 }
 
 # Upload a file
@@ -162,49 +177,51 @@ upload_file() {
     # Copy file to pod
     kubectl cp "$file_path" "open-webui/$POD:/tmp/sync-file" 2>/dev/null
 
+    # Base64 encode credentials to avoid shell expansion issues in kubectl exec
+    local api_key_b64 kb_id_b64 filename_b64
+    api_key_b64=$(printf '%s' "$OPEN_WEBUI_API_KEY" | base64 -w0)
+    kb_id_b64=$(printf '%s' "$OPEN_WEBUI_KNOWLEDGE_ID" | base64 -w0)
+    filename_b64=$(printf '%s' "$safe_name" | base64 -w0)
+
     # Upload and add to KB inside the pod
-    # Pass credentials via env vars to avoid shell expansion issues
     # Handles duplicate content by finding existing file with same hash
-    # Note: stdin redirected from /dev/null to prevent kubectl from consuming the while-read loop
     local result
-    result=$(kubectl exec -n open-webui "$POD" -- \
-        env "API_KEY=$OPEN_WEBUI_API_KEY" "KB_ID=$OPEN_WEBUI_KNOWLEDGE_ID" "FILENAME=$safe_name" \
-        sh -c '
-RESP=$(curl -s -X POST -H "Authorization: Bearer $API_KEY" -F "file=@/tmp/sync-file;filename=$FILENAME" http://localhost:8080/api/v1/files/)
+    result=$(kubectl exec -n open-webui "$POD" -- sh -c "
+API_KEY=\$(echo '$api_key_b64' | base64 -d)
+KB_ID=\$(echo '$kb_id_b64' | base64 -d)
+FILENAME=\$(echo '$filename_b64' | base64 -d)
+
+RESP=\$(curl -s -X POST -H \"Authorization: Bearer \$API_KEY\" -F \"file=@/tmp/sync-file;filename=\$FILENAME\" http://localhost:8080/api/v1/files/)
 
 # Check if response contains an error about duplicate content
-if echo "$RESP" | grep -qi "duplicate"; then
-    # File with same content already exists - this is actually OK
-    # The old file was removed, content exists elsewhere, KB was updated
-    echo "OK_DUPLICATE"
+if echo \"\$RESP\" | grep -qi 'duplicate'; then
+    echo 'OK_DUPLICATE'
     rm -f /tmp/sync-file
     exit 0
 fi
 
-FID=$(echo "$RESP" | python3 -c "import sys,json;print(json.load(sys.stdin).get(\"id\",\"\"))" 2>/dev/null)
-if [ -n "$FID" ] && [ "$FID" != "None" ]; then
-    ADD_RESP=$(curl -s -X POST -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" -d "{\"file_id\":\"$FID\"}" "http://localhost:8080/api/v1/knowledge/$KB_ID/file/add")
-    if echo "$ADD_RESP" | python3 -c "import sys,json;d=json.load(sys.stdin);exit(0 if \"files\" in d else 1)" 2>/dev/null; then
-        echo "OK"
+FID=\$(echo \"\$RESP\" | python3 -c \"import sys,json;print(json.load(sys.stdin).get('id',''))\" 2>/dev/null)
+if [ -n \"\$FID\" ] && [ \"\$FID\" != 'None' ]; then
+    ADD_RESP=\$(curl -s -X POST -H \"Authorization: Bearer \$API_KEY\" -H \"Content-Type: application/json\" -d \"{\\\"file_id\\\":\\\"\$FID\\\"}\" \"http://localhost:8080/api/v1/knowledge/\$KB_ID/file/add\")
+    if echo \"\$ADD_RESP\" | python3 -c \"import sys,json;d=json.load(sys.stdin);exit(0 if 'files' in d else 1)\" 2>/dev/null; then
+        echo 'OK'
     else
-        # Check if error is about file already being in KB (race condition or duplicate)
-        if echo "$ADD_RESP" | grep -qi "already"; then
-            echo "OK_ALREADY"
+        if echo \"\$ADD_RESP\" | grep -qi 'already'; then
+            echo 'OK_ALREADY'
         else
-            curl -s -X DELETE -H "Authorization: Bearer $API_KEY" "http://localhost:8080/api/v1/files/$FID" >/dev/null 2>&1
-            echo "FAIL_KB"
+            curl -s -X DELETE -H \"Authorization: Bearer \$API_KEY\" \"http://localhost:8080/api/v1/files/\$FID\" >/dev/null 2>&1
+            echo 'FAIL_KB'
         fi
     fi
 else
-    # Check if the response indicates the file already exists
-    if echo "$RESP" | grep -qi "exist\|duplicate"; then
-        echo "OK_EXISTS"
+    if echo \"\$RESP\" | grep -qi 'exist\|duplicate'; then
+        echo 'OK_EXISTS'
     else
-        echo "FAIL_UPLOAD: $RESP"
+        echo \"FAIL_UPLOAD: \$RESP\"
     fi
 fi
 rm -f /tmp/sync-file
-' 2>/dev/null)
+" 2>/dev/null)
 
     case "$result" in
         OK*)

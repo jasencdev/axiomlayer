@@ -46,7 +46,7 @@ GitOps-managed K3s homelab with ArgoCD, SSO, TLS, and observability.
 | Open WebUI | https://ai.lab.axiomlayer.com | AI chat interface (Ollama backend) |
 | Outline | https://docs.lab.axiomlayer.com | Documentation wiki |
 | Plane | https://plane.lab.axiomlayer.com | Project management |
-| PocketBase | https://pb.lab.axiomlayer.com | Backend as a Service (BaaS) |
+| PocketBase | https://pb.lab.axiomlayer.com/_/ | Backend as a Service (BaaS) |
 | Telnet Server | https://telnet.lab.axiomlayer.com | Demo app with SSO |
 
 ---

@@ -576,7 +576,7 @@ check_endpoint "Plane" "https://plane.lab.axiomlayer.com/" "200"
 check_endpoint "Longhorn" "https://longhorn.lab.axiomlayer.com/" "302"
 check_endpoint "Alertmanager" "https://alerts.lab.axiomlayer.com/" "302"
 check_endpoint "Campfire" "https://chat.lab.axiomlayer.com/" "302"
-check_endpoint "PocketBase" "https://pb.lab.axiomlayer.com/" "302"
+check_endpoint "PocketBase" "https://pb.lab.axiomlayer.com/_/" "302"
 
 section "Service Endpoints"
 

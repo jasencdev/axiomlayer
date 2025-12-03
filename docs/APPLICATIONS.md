@@ -25,7 +25,7 @@ Comprehensive documentation for all applications deployed in the homelab cluster
 | Open WebUI | ai.lab.axiomlayer.com | open-webui | Yes | PostgreSQL (CNPG) | 5Gi Longhorn |
 | Outline | docs.lab.axiomlayer.com | outline | Yes | PostgreSQL (CNPG) + Redis | 5Gi Longhorn |
 | Plane | plane.lab.axiomlayer.com | plane | Yes | PostgreSQL (Helm) | 10Gi Longhorn |
-| PocketBase | pb.lab.axiomlayer.com | pocketbase | Yes | SQLite (embedded) | 5Gi Longhorn |
+| PocketBase | pb.lab.axiomlayer.com/_/ | pocketbase | Yes | SQLite (embedded) | 5Gi Longhorn |
 | Telnet Server | telnet.lab.axiomlayer.com | telnet-server | Yes | None | None |
 | Dashboard | db.lab.axiomlayer.com | dashboard | Yes | None | None |
 
@@ -416,8 +416,8 @@ Additional manifests in `apps/plane/`:
 
 | Property | Value |
 |----------|-------|
-| URL | https://pb.lab.axiomlayer.com |
-| Admin UI | https://pb.lab.axiomlayer.com/_/ |
+| URL | https://pb.lab.axiomlayer.com/_/ |
+| API Base | https://pb.lab.axiomlayer.com/api |
 | Namespace | pocketbase |
 | Image | ghcr.io/muchobien/pocketbase:latest |
 | Port | 8090 |

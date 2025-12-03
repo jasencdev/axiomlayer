@@ -109,7 +109,7 @@ homelab-gitops/
 | Open WebUI | ai.lab.axiomlayer.com | Forward Auth | open-webui | CNPG |
 | Campfire | chat.lab.axiomlayer.com | Forward Auth | campfire | SQLite |
 | n8n | autom8.lab.axiomlayer.com | Forward Auth | n8n | CNPG |
-| PocketBase | pb.lab.axiomlayer.com | Forward Auth | pocketbase | SQLite |
+| PocketBase | pb.lab.axiomlayer.com/_/ | Forward Auth | pocketbase | SQLite |
 | Alertmanager | alerts.lab.axiomlayer.com | Forward Auth | monitoring | - |
 | Longhorn | longhorn.lab.axiomlayer.com | Forward Auth | longhorn-system | - |
 | ArgoCD | argocd.lab.axiomlayer.com | Dex OIDC | argocd | - |
