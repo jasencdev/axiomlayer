@@ -305,6 +305,13 @@ else
     fail "Telnet Server is not running"
 fi
 
+# PocketBase (BaaS)
+if kubectl get pods -n pocketbase -l app.kubernetes.io/name=pocketbase --no-headers 2>/dev/null | grep -q "Running"; then
+    pass "PocketBase is running"
+else
+    fail "PocketBase is not running"
+fi
+
 section "Plane Components"
 
 # Plane uses its own StatefulSets for databases and services
@@ -444,6 +451,7 @@ REQUIRED_NETPOL_NS=(
     "n8n"
     "open-webui"
     "campfire"
+    "pocketbase"
     "authentik"
     "plane"
 )
@@ -568,6 +576,7 @@ check_endpoint "Plane" "https://plane.lab.axiomlayer.com/" "200"
 check_endpoint "Longhorn" "https://longhorn.lab.axiomlayer.com/" "302"
 check_endpoint "Alertmanager" "https://alerts.lab.axiomlayer.com/" "302"
 check_endpoint "Campfire" "https://chat.lab.axiomlayer.com/" "302"
+check_endpoint "PocketBase" "https://pb.lab.axiomlayer.com/" "302"
 
 section "Service Endpoints"
 
@@ -591,6 +600,7 @@ check_service "Outline" "outline" "outline" "3000"
 check_service "n8n" "n8n" "n8n" "5678"
 check_service "Open WebUI" "open-webui" "open-webui" "8080"
 check_service "Campfire" "campfire" "campfire" "3000"
+check_service "PocketBase" "pocketbase" "pocketbase" "8090"
 check_service "Authentik" "authentik" "authentik-helm-server" "80"
 check_service "Grafana" "monitoring" "kube-prometheus-stack-grafana" "80"
 check_service "Prometheus" "monitoring" "kube-prometheus-stack-prometheus" "9090"

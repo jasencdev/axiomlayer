@@ -10,6 +10,7 @@ Comprehensive documentation for all applications deployed in the homelab cluster
 - [Open WebUI](#open-webui)
 - [Outline](#outline)
 - [Plane](#plane)
+- [PocketBase](#pocketbase)
 - [Telnet Server](#telnet-server)
 - [Dashboard](#dashboard)
 
@@ -24,6 +25,7 @@ Comprehensive documentation for all applications deployed in the homelab cluster
 | Open WebUI | ai.lab.axiomlayer.com | open-webui | Yes | PostgreSQL (CNPG) | 5Gi Longhorn |
 | Outline | docs.lab.axiomlayer.com | outline | Yes | PostgreSQL (CNPG) + Redis | 5Gi Longhorn |
 | Plane | plane.lab.axiomlayer.com | plane | Yes | PostgreSQL (Helm) | 10Gi Longhorn |
+| PocketBase | pb.lab.axiomlayer.com | pocketbase | Yes | SQLite (embedded) | 5Gi Longhorn |
 | Telnet Server | telnet.lab.axiomlayer.com | telnet-server | Yes | None | None |
 | Dashboard | db.lab.axiomlayer.com | dashboard | Yes | None | None |
 
@@ -403,6 +405,123 @@ Plane uses its own Helm chart with embedded dependencies:
 Additional manifests in `apps/plane/`:
 - `certificate.yaml`: TLS certificate
 - `ingress.yaml`: Custom ingress with SSO
+
+---
+
+## PocketBase
+
+**Backend as a Service (BaaS) platform**
+
+### Overview
+
+| Property | Value |
+|----------|-------|
+| URL | https://pb.lab.axiomlayer.com |
+| Admin UI | https://pb.lab.axiomlayer.com/_/ |
+| Namespace | pocketbase |
+| Image | ghcr.io/muchobien/pocketbase:latest |
+| Port | 8090 |
+| Replicas | 1 |
+
+### Components
+
+```
+pocketbase/
+├── namespace.yaml
+├── deployment.yaml
+├── service.yaml
+├── certificate.yaml
+├── ingress.yaml         # SSO protected
+├── pvc.yaml             # 5Gi for /pb_data
+├── networkpolicy.yaml
+└── kustomization.yaml
+```
+
+### Database
+
+PocketBase uses an embedded SQLite database stored in the persistent volume at `/pb_data`. This includes:
+- Application data
+- User authentication
+- File uploads
+- Logs
+
+### Configuration
+
+PocketBase is configured through its web admin interface at `/_/`. On first access:
+1. Navigate to https://pb.lab.axiomlayer.com/_/
+2. Create the initial admin account
+3. Configure collections, API rules, and authentication providers
+
+### API Access
+
+**REST API:**
+```
+https://pb.lab.axiomlayer.com/api/collections/{collection}/records
+```
+
+**Realtime subscriptions (SSE):**
+```
+https://pb.lab.axiomlayer.com/api/realtime
+```
+
+### Authentication
+
+PocketBase supports multiple auth methods:
+- Email/password
+- OAuth2 providers
+- API keys
+
+Note: The ingress is protected by Authentik forward auth, so users must authenticate via SSO before accessing PocketBase. Internal PocketBase authentication is separate and managed within the application.
+
+### Use Cases
+
+- Mobile/web app backends
+- Rapid prototyping
+- Simple CRUD APIs
+- File storage with API access
+- User authentication for client apps
+
+### Network Policies
+
+PocketBase has restricted network access:
+- **Ingress:** Only from Traefik (port 8090)
+- **Egress:** DNS resolution + HTTPS for OAuth providers/webhooks
+
+### Backup Strategy
+
+PocketBase data is backed up via Longhorn volume snapshots:
+- Daily snapshots retained for 7 days
+- Weekly snapshots retained for 4 weeks
+- Remote backups to NAS
+
+For point-in-time recovery or migration, the SQLite database can be exported directly:
+```bash
+kubectl cp pocketbase/$(kubectl get pod -n pocketbase -l app.kubernetes.io/name=pocketbase -o jsonpath='{.items[0].metadata.name}'):/pb_data/data.db ./pocketbase-backup.db
+```
+
+### Troubleshooting
+
+**Admin UI not loading:**
+```bash
+# Check pod status
+kubectl get pods -n pocketbase
+
+# Check logs
+kubectl logs -n pocketbase -l app.kubernetes.io/name=pocketbase
+```
+
+**API returning 403:**
+- Verify collection API rules in admin UI
+- Check if authentication is required for the endpoint
+
+**Storage issues:**
+```bash
+# Check PVC status
+kubectl get pvc -n pocketbase
+
+# Check Longhorn volume health
+kubectl get volumes.longhorn.io -n longhorn-system | grep pocketbase
+```
 
 ---
 

@@ -53,6 +53,7 @@ homelab-gitops/
 │   ├── n8n/                  # Workflow automation
 │   ├── outline/              # Documentation wiki
 │   ├── plane/                # Project management
+│   ├── pocketbase/           # Backend as a Service
 │   └── telnet-server/        # Demo app
 ├── infrastructure/           # Core infrastructure
 │   ├── actions-runner/       # GitHub Actions self-hosted runners
@@ -95,6 +96,7 @@ homelab-gitops/
 | Logging | Loki + Promtail | Log aggregation |
 | Network | Tailscale | Mesh VPN |
 | AI/LLM | Open WebUI + Ollama | Chat interface |
+| BaaS | PocketBase | Backend as a Service (SQLite) |
 | Backups | Longhorn + CronJob | Volume backups + SQL dumps to NAS |
 | Secrets | Sealed Secrets | Encrypted secrets in Git |
 | Doc Sync | scripts/sync-*.sh | Hash-based sync to Outline + RAG |
@@ -107,6 +109,7 @@ homelab-gitops/
 | Open WebUI | ai.lab.axiomlayer.com | Forward Auth | open-webui | CNPG |
 | Campfire | chat.lab.axiomlayer.com | Forward Auth | campfire | SQLite |
 | n8n | autom8.lab.axiomlayer.com | Forward Auth | n8n | CNPG |
+| PocketBase | pb.lab.axiomlayer.com | Forward Auth | pocketbase | SQLite |
 | Alertmanager | alerts.lab.axiomlayer.com | Forward Auth | monitoring | - |
 | Longhorn | longhorn.lab.axiomlayer.com | Forward Auth | longhorn-system | - |
 | ArgoCD | argocd.lab.axiomlayer.com | Dex OIDC | argocd | - |

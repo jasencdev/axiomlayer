@@ -152,6 +152,7 @@ K3s includes ServiceLB (formerly Klipper), which:
 | outline | outline-data | 5Gi | longhorn | Outline attachments |
 | outline | outline-db-1 | 5Gi | longhorn | Outline PostgreSQL |
 | plane | pvc-plane-* | various | longhorn | Plane components |
+| pocketbase | pocketbase-data | 5Gi | longhorn | PocketBase SQLite + files |
 
 ### Backup Architecture
 
