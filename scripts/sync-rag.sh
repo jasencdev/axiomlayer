@@ -17,7 +17,14 @@ set -euo pipefail
 
 # Configuration
 REPO_ROOT="${REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-export KUBECONFIG="${KUBECONFIG:-/home/jasen/.kube/config}"
+# Use KUBECONFIG from env, or default locations
+if [[ -z "${KUBECONFIG:-}" ]]; then
+    if [[ -f "$HOME/.kube/config" ]]; then
+        export KUBECONFIG="$HOME/.kube/config"
+    elif [[ -f "/home/jasen/.kube/config" ]]; then
+        export KUBECONFIG="/home/jasen/.kube/config"
+    fi
+fi
 
 # Colors
 RED='\033[0;31m'
@@ -94,11 +101,17 @@ get_all_matching_files() {
 # Fetch existing files from knowledge base with their hashes
 fetch_kb_files() {
     local result
-    result=$(cat <<FETCH_SCRIPT | kubectl exec -i -n open-webui "$POD" -- bash 2>/dev/null
-curl -s -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' \
-    'http://localhost:8080/api/v1/knowledge/$OPEN_WEBUI_KNOWLEDGE_ID'
-FETCH_SCRIPT
-)
+    # Pass env vars explicitly to the pod shell
+    result=$(kubectl exec -i -n open-webui "$POD" -- bash -c "curl -s -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' 'http://localhost:8080/api/v1/knowledge/$OPEN_WEBUI_KNOWLEDGE_ID'" 2>/dev/null)
+
+    # Debug: check if we got valid JSON with files
+    if [[ -z "$result" ]]; then
+        log_warn "Empty response from knowledge base API"
+    elif ! echo "$result" | python3 -c 'import sys,json; json.load(sys.stdin)' 2>/dev/null; then
+        log_warn "Invalid JSON response from knowledge base API"
+        log_warn "Response: ${result:0:200}..."
+    fi
+
     echo "$result"
 }
 
