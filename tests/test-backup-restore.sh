@@ -399,7 +399,8 @@ test_longhorn_volume_health() {
     # Check for degraded volumes
     local degraded_volumes
     degraded_volumes=$(kubectl get volumes -n "$BACKUP_NAMESPACE" \
-        -o jsonpath='{range .items[*]}{.status.robustness}{"\n"}{end}' 2>/dev/null | grep -c "degraded" || echo "0")
+        -o jsonpath='{range .items[*]}{.status.robustness}{"\n"}{end}' 2>/dev/null | grep -c "degraded" 2>/dev/null || true)
+    degraded_volumes="${degraded_volumes:-0}"
 
     if [[ "$degraded_volumes" -gt 0 ]]; then
         fail "Found $degraded_volumes degraded volume(s) - backup reliability affected"
@@ -408,7 +409,8 @@ test_longhorn_volume_health() {
     # Check for faulted volumes
     local faulted_volumes
     faulted_volumes=$(kubectl get volumes -n "$BACKUP_NAMESPACE" \
-        -o jsonpath='{range .items[*]}{.status.robustness}{"\n"}{end}' 2>/dev/null | grep -c "faulted" || echo "0")
+        -o jsonpath='{range .items[*]}{.status.robustness}{"\n"}{end}' 2>/dev/null | grep -c "faulted" 2>/dev/null || true)
+    faulted_volumes="${faulted_volumes:-0}"
 
     if [[ "$faulted_volumes" -gt 0 ]]; then
         fail "Found $faulted_volumes faulted volume(s) - CRITICAL: data at risk"

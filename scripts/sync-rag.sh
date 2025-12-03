@@ -17,7 +17,14 @@ set -euo pipefail
 
 # Configuration
 REPO_ROOT="${REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-export KUBECONFIG="${KUBECONFIG:-/home/jasen/.kube/config}"
+# Use KUBECONFIG from env, or default locations
+if [[ -z "${KUBECONFIG:-}" ]]; then
+    if [[ -f "$HOME/.kube/config" ]]; then
+        export KUBECONFIG="$HOME/.kube/config"
+    elif [[ -f "/home/jasen/.kube/config" ]]; then
+        export KUBECONFIG="/home/jasen/.kube/config"
+    fi
+fi
 
 # Colors
 RED='\033[0;31m'
@@ -94,11 +101,17 @@ get_all_matching_files() {
 # Fetch existing files from knowledge base with their hashes
 fetch_kb_files() {
     local result
-    result=$(cat <<FETCH_SCRIPT | kubectl exec -i -n open-webui "$POD" -- bash 2>/dev/null
-curl -s -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' \
-    'http://localhost:8080/api/v1/knowledge/$OPEN_WEBUI_KNOWLEDGE_ID'
-FETCH_SCRIPT
-)
+    # Pass env vars explicitly to the pod shell
+    result=$(kubectl exec -i -n open-webui "$POD" -- bash -c "curl -s -H 'Authorization: Bearer $OPEN_WEBUI_API_KEY' 'http://localhost:8080/api/v1/knowledge/$OPEN_WEBUI_KNOWLEDGE_ID'" 2>/dev/null)
+
+    # Debug: check if we got valid JSON with files
+    if [[ -z "$result" ]]; then
+        log_warn "Empty response from knowledge base API"
+    elif ! echo "$result" | python3 -c 'import sys,json; json.load(sys.stdin)' 2>/dev/null; then
+        log_warn "Invalid JSON response from knowledge base API"
+        log_warn "Response: ${result:0:200}..."
+    fi
+
     echo "$result"
 }
 
@@ -181,12 +194,13 @@ sync_to_rag() {
     kb_json=$(fetch_kb_files)
 
     # Build hash lookup (associative array)
-    declare -A KB_HASHES
+    declare -A KB_HASHES=()
     while IFS=$'\t' read -r name hash; do
         [[ -n "$name" ]] && KB_HASHES["$name"]="$hash"
     done < <(parse_kb_files "$kb_json")
 
-    log_info "Found ${#KB_HASHES[@]} existing files in knowledge base"
+    local kb_count="${#KB_HASHES[@]}"
+    log_info "Found $kb_count existing files in knowledge base"
     echo ""
 
     local uploaded=0
@@ -263,7 +277,7 @@ sync_to_rag() {
 
     echo ""
     log_info "===== Sync Summary ====="
-    log_info "  Files in KB:  ${#KB_HASHES[@]}"
+    log_info "  Files in KB:  $kb_count"
     log_info "  Unchanged:    $unchanged (skipped - no embedding needed)"
     log_info "  Uploaded:     $uploaded"
     log_info "  Skipped:      $skipped (too large)"
