@@ -724,7 +724,7 @@ data:
           'plane.lab.axiomlayer.com': 'plane',
           'docs.lab.axiomlayer.com': 'outline',
           'autom8.lab.axiomlayer.com': 'n8n',
-          'pb.lab.axiomlayer.com/_/': 'pocketbase',
+          'pb.lab.axiomlayer.com': 'pocketbase',
           'auth.lab.axiomlayer.com': 'authentik',
           'argocd.lab.axiomlayer.com': 'argocd',
           'grafana.lab.axiomlayer.com': 'monitoring',
