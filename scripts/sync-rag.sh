@@ -107,18 +107,36 @@ fetch_kb_files() {
     api_key_b64=$(printf '%s' "$OPEN_WEBUI_API_KEY" | base64 -w0)
     kb_id_b64=$(printf '%s' "$OPEN_WEBUI_KNOWLEDGE_ID" | base64 -w0)
 
+    local exec_stderr
+    exec_stderr=$(mktemp)
     result=$(kubectl exec -n open-webui "$POD" -- sh -c "
         API_KEY=\$(echo '$api_key_b64' | base64 -d)
         KB_ID=\$(echo '$kb_id_b64' | base64 -d)
         curl -s -H \"Authorization: Bearer \$API_KEY\" \"http://localhost:8080/api/v1/knowledge/\$KB_ID\"
-    " 2>/dev/null)
+    " 2>"$exec_stderr")
+    local exec_rc=$?
+
+    # Debug: check for kubectl exec errors
+    if [[ $exec_rc -ne 0 ]]; then
+        log_error "kubectl exec failed with exit code $exec_rc"
+        log_error "stderr: $(cat "$exec_stderr")"
+    fi
+    rm -f "$exec_stderr"
 
     # Debug: check if we got valid JSON with files
     if [[ -z "$result" ]]; then
         log_warn "Empty response from knowledge base API"
     elif ! echo "$result" | python3 -c 'import sys,json; json.load(sys.stdin)' 2>/dev/null; then
         log_warn "Invalid JSON response from knowledge base API"
-        log_warn "Response: ${result:0:200}..."
+        log_warn "Response: ${result:0:500}..."
+    else
+        # Log the API response for debugging
+        local file_count
+        file_count=$(echo "$result" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(len(d.get("files", [])))' 2>/dev/null || echo "0")
+        if [[ "$file_count" == "0" ]]; then
+            # Show more context when no files found
+            log_warn "API returned 0 files. Response keys: $(echo "$result" | python3 -c 'import sys,json; print(list(json.load(sys.stdin).keys()))' 2>/dev/null || echo 'parse error')"
+        fi
     fi
 
     echo "$result"
