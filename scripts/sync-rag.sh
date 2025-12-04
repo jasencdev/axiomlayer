@@ -374,11 +374,40 @@ sync_to_rag() {
 
     done < <(get_all_matching_files)
 
+    # Build set of local safe filenames for cleanup comparison
+    declare -A LOCAL_SAFE_NAMES=()
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+        if ! is_excluded "$file"; then
+            local safe_name
+            safe_name=$(path_to_safe_name "$file")
+            LOCAL_SAFE_NAMES["$safe_name"]=1
+        fi
+    done < <(get_all_matching_files)
+
+    # Cleanup: Remove KB files that no longer exist in repo
+    local removed=0
+    echo ""
+    log_info "Checking for stale files in knowledge base..."
+    for kb_name in "${!KB_FILE_IDS[@]}"; do
+        if [[ -z "${LOCAL_SAFE_NAMES[$kb_name]:-}" ]]; then
+            log_info "Removing stale file: $kb_name"
+            local file_id="${KB_FILE_IDS[$kb_name]}"
+            if remove_file_from_kb "$file_id" >/dev/null 2>&1; then
+                log_info "  ✓ Removed successfully"
+                removed=$((removed + 1))
+            else
+                log_warn "  ⚠ Failed to remove"
+            fi
+        fi
+    done
+
     echo ""
     log_info "===== Sync Summary ====="
     log_info "  Files in KB:  $kb_count"
     log_info "  Unchanged:    $unchanged (skipped - no embedding needed)"
     log_info "  Uploaded:     $uploaded"
+    log_info "  Removed:      $removed (stale files cleaned up)"
     log_info "  Skipped:      $skipped (too large)"
     log_info "  Failed:       $failed"
 
