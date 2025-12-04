@@ -796,11 +796,14 @@ done
 section "Cert-Manager Health"
 
 # Check cert-manager controller logs for errors
+# Exclude normal propagation checks which log "error" but are not failures
 CM_LOGS=$(kubectl logs -n cert-manager -l app.kubernetes.io/name=cert-manager --tail=100 2>/dev/null)
+# Filter out propagation check messages (normal during DNS-01 challenges)
+CM_ERRORS=$(echo "$CM_LOGS" | grep -i "error\|failed" | grep -v "propagation check" | grep -v "optimistic locking" || true)
 
-if echo "$CM_LOGS" | grep -qi "error.*acme\|failed.*challenge\|rate.*limit"; then
-    ACME_ERRORS=$(echo "$CM_LOGS" | grep -ci "error.*acme\|failed.*challenge" || echo "0")
-    if [ "$ACME_ERRORS" -gt 20 ]; then
+if echo "$CM_ERRORS" | grep -qi "acme\|challenge\|rate.*limit"; then
+    ACME_ERRORS=$(echo "$CM_ERRORS" | grep -ci "acme\|challenge" || echo "0")
+    if [ "$ACME_ERRORS" -gt 10 ]; then
         fail "cert-manager has $ACME_ERRORS recent ACME errors (excessive)"
     else
         # Transient ACME errors are common during certificate renewal
