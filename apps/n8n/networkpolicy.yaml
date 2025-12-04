@@ -112,6 +112,14 @@ spec:
     - Ingress
     - Egress
   ingress:
+    # Allow intra-cluster replication between CNPG pods
+    - from:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: n8n-db
+      ports:
+        - protocol: TCP
+          port: 5432
     # Allow n8n app to connect
     - from:
         - podSelector:
@@ -131,6 +139,14 @@ spec:
         - protocol: TCP
           port: 8000
   egress:
+    # Allow intra-cluster replication between CNPG pods
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: n8n-db
+      ports:
+        - protocol: TCP
+          port: 5432
     # Allow DNS
     - to:
         - namespaceSelector: {}

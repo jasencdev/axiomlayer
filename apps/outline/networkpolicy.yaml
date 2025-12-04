@@ -181,6 +181,14 @@ spec:
     - Ingress
     - Egress
   ingress:
+    # Allow intra-cluster replication between CNPG pods
+    - from:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: outline-db
+      ports:
+        - protocol: TCP
+          port: 5432
     # Allow outline app
     - from:
         - podSelector:
@@ -211,6 +219,14 @@ spec:
         - protocol: TCP
           port: 5432
   egress:
+    # Allow intra-cluster replication between CNPG pods
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: outline-db
+      ports:
+        - protocol: TCP
+          port: 5432
     # Allow DNS
     - to:
         - namespaceSelector: {}
