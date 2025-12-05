@@ -6,6 +6,8 @@ resources:
   - configmap.yaml
   - sealed-secret.yaml
   - sealed-pull-secret.yaml
+  - minio-sealed-secret.yaml
+  - litestream-config.yaml
   - deployment.yaml
   - service.yaml
   - certificate.yaml

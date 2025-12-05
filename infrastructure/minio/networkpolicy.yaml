@@ -1,10 +1,10 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: campfire-default-deny
-  namespace: campfire
+  name: minio-default-deny
+  namespace: minio
   labels:
-    app.kubernetes.io/name: campfire
+    app.kubernetes.io/name: minio
     app.kubernetes.io/component: network-policy
     app.kubernetes.io/part-of: homelab
     app.kubernetes.io/managed-by: argocd
@@ -17,48 +17,63 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: campfire-allow-ingress
-  namespace: campfire
+  name: minio-allow-ingress
+  namespace: minio
   labels:
-    app.kubernetes.io/name: campfire
+    app.kubernetes.io/name: minio
     app.kubernetes.io/component: network-policy
     app.kubernetes.io/part-of: homelab
     app.kubernetes.io/managed-by: argocd
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: campfire
+      app.kubernetes.io/name: minio
   policyTypes:
     - Ingress
   ingress:
+    # Allow from PocketBase namespace (Litestream sidecar)
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: kube-system
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: traefik
+              kubernetes.io/metadata.name: pocketbase
       ports:
         - protocol: TCP
-          port: 80
+          port: 9000
+    # Allow from Campfire namespace (Litestream sidecar)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: campfire
+      ports:
+        - protocol: TCP
+          port: 9000
+    # Allow from longhorn-system for backups
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: longhorn-system
+      ports:
+        - protocol: TCP
+          port: 9000
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: campfire-allow-egress
-  namespace: campfire
+  name: minio-allow-egress
+  namespace: minio
   labels:
-    app.kubernetes.io/name: campfire
+    app.kubernetes.io/name: minio
     app.kubernetes.io/component: network-policy
     app.kubernetes.io/part-of: homelab
     app.kubernetes.io/managed-by: argocd
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: campfire
+      app.kubernetes.io/name: minio
   policyTypes:
     - Egress
   egress:
+    # Allow DNS resolution
     - to:
         - namespaceSelector: {}
           podSelector:
@@ -69,23 +84,3 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: authentik
-      ports:
-        - protocol: TCP
-          port: 9000
-        - protocol: TCP
-          port: 9443
-    # Allow MinIO for Litestream replication
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: minio
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: minio
-      ports:
-        - protocol: TCP
-          port: 9000

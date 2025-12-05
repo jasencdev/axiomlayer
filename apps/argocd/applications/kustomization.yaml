@@ -19,6 +19,7 @@ resources:
   - longhorn.yaml
   - longhorn-helm.yaml
   - loki.yaml
+  - minio.yaml
   - n8n.yaml
   - open-webui.yaml
   - outline.yaml

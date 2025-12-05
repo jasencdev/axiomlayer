@@ -75,7 +75,43 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
+        - name: litestream
+          image: litestream/litestream:0.3
+          args: ["replicate"]
+          volumeMounts:
+            - name: storage
+              mountPath: /rails/storage
+            - name: litestream-config
+              mountPath: /etc/litestream.yml
+              subPath: litestream.yml
+          env:
+            - name: LITESTREAM_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: root-user
+            - name: LITESTREAM_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: root-password
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
       volumes:
         - name: storage
           persistentVolumeClaim:
             claimName: campfire-storage
+        - name: litestream-config
+          configMap:
+            name: litestream-config

@@ -81,3 +81,14 @@ spec:
       ports:
         - protocol: TCP
           port: 443
+    # Allow MinIO for Litestream replication
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: minio
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: minio
+      ports:
+        - protocol: TCP
+          port: 9000
