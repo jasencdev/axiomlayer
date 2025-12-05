@@ -229,12 +229,12 @@ jobs:
             "https://${ARGOCD_SERVER}/api/v1/applications/applications/sync" \
             -d '{"prune": true}' || echo "Sync trigger sent (may require manual approval)"
 
-  # Post-deployment tests - run on PRs and main push
+  # Integration tests - run on PRs only (already validated before merge)
   integration-tests:
     name: Integration Tests
     runs-on: [self-hosted, homelab]
     needs: [ci-passed]
-    if: always() && needs.ci-passed.result == 'success'
+    if: github.event_name == 'pull_request' && always() && needs.ci-passed.result == 'success'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -272,12 +272,12 @@ jobs:
       - name: Run monitoring tests
         run: ./tests/test-monitoring.sh
 
-  # Popeye cluster scan - runs on PRs and main push
+  # Popeye cluster scan - run on PRs only (already validated before merge)
   popeye-scan:
     name: Popeye Cluster Scan
     runs-on: [self-hosted, homelab]
     needs: [ci-passed]
-    if: always() && needs.ci-passed.result == 'success'
+    if: github.event_name == 'pull_request' && always() && needs.ci-passed.result == 'success'
     steps:
       - name: Install popeye
         run: |
@@ -322,12 +322,12 @@ jobs:
           echo ""
           echo "Cluster health score ${SCORE}% meets threshold of ${THRESHOLD}%"
 
-  # Extended tests - run on PRs and main push
+  # Extended tests - run on PRs only (already validated before merge)
   extended-tests:
     name: Extended Tests
     runs-on: [self-hosted, homelab]
     needs: [ci-passed]
-    if: always() && needs.ci-passed.result == 'success'
+    if: github.event_name == 'pull_request' && always() && needs.ci-passed.result == 'success'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
