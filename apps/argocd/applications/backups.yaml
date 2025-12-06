@@ -13,7 +13,7 @@ spec:
     path: infrastructure/backups
   destination:
     server: https://kubernetes.default.svc
-    namespace: longhorn-system
+    namespace: default
   syncPolicy:
     automated:
       prune: true

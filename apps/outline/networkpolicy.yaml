@@ -207,11 +207,11 @@ spec:
           port: 5432
         - protocol: TCP
           port: 8000
-    # Allow backup jobs from longhorn-system
+    # Allow backup jobs from default namespace
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: longhorn-system
+              kubernetes.io/metadata.name: default
           podSelector:
             matchLabels:
               app.kubernetes.io/name: homelab-backup

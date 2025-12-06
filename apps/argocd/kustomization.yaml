@@ -8,7 +8,6 @@ resources:
   - sealed-secret.yaml
   - applications/cert-manager.yaml
   - applications/authentik.yaml
-  - applications/longhorn.yaml
   - applications/cloudnative-pg.yaml
   - applications/telnet-server.yaml
   - applications/loki.yaml

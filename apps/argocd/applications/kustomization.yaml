@@ -16,8 +16,6 @@ resources:
   - external-dns.yaml
   - kube-prometheus-stack.yaml
   - monitoring-extras.yaml
-  - longhorn.yaml
-  - longhorn-helm.yaml
   - loki.yaml
   - minio.yaml
   - n8n.yaml

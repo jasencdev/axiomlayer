@@ -30,22 +30,22 @@ spec:
         postgres:
           local_setup: true
           volumeSize: 10Gi
-          storageClass: longhorn
+          storageClass: local-path
 
         redis:
           local_setup: true
           volumeSize: 1Gi
-          storageClass: longhorn
+          storageClass: local-path
 
         rabbitmq:
           local_setup: true
           volumeSize: 1Gi
-          storageClass: longhorn
+          storageClass: local-path
 
         minio:
           local_setup: true
           volumeSize: 10Gi
-          storageClass: longhorn
+          storageClass: local-path
 
         api:
           memoryRequest: 200Mi
