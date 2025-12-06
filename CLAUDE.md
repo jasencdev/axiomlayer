@@ -5,7 +5,7 @@
 GitOps-managed K3s homelab with ArgoCD, SSO, TLS, observability, and automated backups.
 
 - **Domain**: `*.lab.axiomlayer.com`
-- **Cluster**: 4-node K3s over Tailscale mesh (2 control-plane, 2 workers)
+- **Cluster**: 3-node K3s over Tailscale mesh (2 control-plane, 1 worker)
 - **Repository**: https://github.com/jasencdev/axiomlayer
 - **K3s Version**: v1.33.6+k3s1
 - **Shell**: zsh 5.9 (Ubuntu default on this workstation)
@@ -35,11 +35,15 @@ GitOps-managed K3s homelab with ArgoCD, SSO, TLS, observability, and automated b
 
 | Node | Role | Tailscale IP | Purpose |
 |------|------|--------------|---------|
-| neko | control-plane, etcd, master | 100.67.134.110 | K3s server (primary) |
-| neko2 | control-plane, etcd, master | 100.106.35.14 | K3s server (HA) |
-| panther | worker | 100.79.124.94 | K3s agent (main workloads, RTX 3050 Ti for embeddings) |
+| neko | control-plane, etcd, master | 100.67.134.110 | K3s server (primary, tainted NoSchedule) |
+| neko2 | control-plane, etcd, master | 100.106.35.14 | K3s server (HA, tainted NoSchedule) |
+| siberian | worker | 100.115.3.88 | K3s agent (main workloads, RTX 5070 Ti) |
+
+### Offline Nodes (available for future use)
+| Node | Role | Tailscale IP | Purpose |
+|------|------|--------------|---------|
+| panther | worker | 100.79.124.94 | K3s agent (RTX 3050 Ti for embeddings) |
 | bobcat | worker | 100.121.67.60 | K3s agent (Raspberry Pi 5 + M.2 NVMe HAT) |
-| siberian | external | - | GPU workstation (Ollama generation, RTX 5070 Ti) |
 
 ## Structure
 
@@ -626,10 +630,9 @@ Full documentation in Outline at https://docs.lab.axiomlayer.com:
 - ArgoCD self-manages via `argocd-helm` app with **manual sync only** (prevents chicken/egg issues)
 - Helm charts (ArgoCD, Authentik, Longhorn, kube-prometheus-stack, cert-manager, actions-runner-controller) installed via ArgoCD Helm source
 - TLS termination at Traefik; internal services use HTTP
-- Ollama for LLM generation runs on siberian (GPU workstation, RTX 5070 Ti) via Tailscale at 100.115.3.88:11434
-- Ollama for embeddings runs on panther (RTX 3050 Ti) via Tailscale at 100.79.124.94:11434
+- Ollama for LLM generation and embeddings runs on siberian (RTX 5070 Ti) via Tailscale at 100.115.3.88:11434
 - Open WebUI uses granite4:3b model for RAG embeddings
 - GitHub Actions runners have read-only cluster RBAC for tests
 - Backup CronJob runs from any node (direct NAS access)
-- panther is the primary worker node for most workloads
+- siberian is the primary worker node for all workloads (control-plane nodes are tainted NoSchedule)
 - Sealed Secrets controller is GitOps-managed in infrastructure/sealed-secrets/
