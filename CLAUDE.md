@@ -5,7 +5,7 @@
 GitOps-managed K3s homelab with ArgoCD, SSO, TLS, observability, and automated backups.
 
 - **Domain**: `*.lab.axiomlayer.com`
-- **Cluster**: 4-node K3s over Tailscale mesh (2 control-plane, 2 workers)
+- **Cluster**: 5-node K3s over Tailscale mesh (3 control-plane, 2 workers)
 - **Repository**: https://github.com/jasencdev/axiomlayer
 - **K3s Version**: v1.33.6+k3s1
 - **Shell**: zsh 5.9 (Ubuntu default on this workstation)
@@ -37,9 +37,13 @@ GitOps-managed K3s homelab with ArgoCD, SSO, TLS, observability, and automated b
 |------|------|--------------|---------|
 | neko | control-plane, etcd, master | 100.67.134.110 | K3s server (primary) |
 | neko2 | control-plane, etcd, master | 100.106.35.14 | K3s server (HA) |
+| bobcat | control-plane, etcd, master | 100.121.67.60 | K3s server (etcd quorum, Raspberry Pi 5 + M.2 NVMe HAT) - **watcher only** |
 | panther | worker | 100.79.124.94 | K3s agent (main workloads, RTX 3050 Ti for embeddings) |
-| bobcat | worker | 100.121.67.60 | K3s agent (Raspberry Pi 5 + M.2 NVMe HAT) |
-| siberian | external | - | GPU workstation (Ollama generation, RTX 5070 Ti) |
+| siberian | worker | - | K3s agent + GPU workstation (Ollama generation, RTX 5070 Ti) |
+
+**Node Taints:**
+- `bobcat`: `workloads=false:NoSchedule` - No application workloads, etcd quorum only
+- All control-plane nodes: `node-role.kubernetes.io/control-plane:NoSchedule` (K3s default)
 
 ## Structure
 
