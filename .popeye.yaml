@@ -1,5 +1,8 @@
-# Popeye spinfile - exclude known issues we can't fix
-# Format for popeye 0.21.x
+# Popeye spinfile - ONLY exclude issues genuinely outside our control
+# Each exclusion must have a documented reason
+#
+# Raw score without exclusions: ~79%
+# Goal: Honest reporting of what we control
 
 popeye:
   allocations:
@@ -13,8 +16,15 @@ popeye:
   excludes:
     global:
       fqns:
-        - rx:kube-system
-        - rx:kube-public
-        - rx:kube-node-lease
-        - rx:cnpg-system
-        - rx:longhorn-system
+        # K3s managed components - we don't control their resource specs
+        - rx:kube-system/svclb-           # K3s ServiceLB DaemonSet pods
+        - rx:kube-system/coredns          # K3s managed CoreDNS
+        - rx:kube-system/traefik          # K3s Helm-managed Traefik
+        - rx:kube-system/metrics-server   # K3s managed metrics-server
+        - rx:kube-system/local-path       # K3s managed provisioner
+        # Operators managed by Helm - outside GitOps control
+        - rx:cnpg-system/                 # CNPG operator, Helm-managed
+        - rx:longhorn-system/             # Longhorn operator, Helm-managed
+        # Empty K8s default namespaces
+        - rx:^kube-public$
+        - rx:^kube-node-lease$
