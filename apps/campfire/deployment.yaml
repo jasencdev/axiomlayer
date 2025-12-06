@@ -24,7 +24,7 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/arch: amd64
-        kubernetes.io/hostname: neko
+        kubernetes.io/hostname: neko-ctrl
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
