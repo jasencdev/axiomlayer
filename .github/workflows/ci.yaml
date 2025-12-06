@@ -15,50 +15,60 @@ permissions:
   contents: read
 
 jobs:
-  validate-manifests:
-    name: Validate Manifests
+  validate:
+    name: Validate
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install kubectl
         run: |
           curl -fsSLo kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 
       - name: Validate kustomizations
         run: ./tests/validate-manifests.sh
 
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Trivy
+      - name: Scan for secrets
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
+          trivy fs . --scanners secret --exit-code 1
 
-      - name: Scan for secrets
-        run: trivy fs . --scanners secret --exit-code 1
-
-  ci-passed:
-    name: CI Passed
+  deploy:
+    name: Deploy
     runs-on: ubuntu-latest
-    needs: [validate-manifests, security]
-    if: always()
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
     steps:
-      - name: Check CI results
+      - uses: actions/checkout@v4
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Install kubectl
         run: |
-          if [ "${{ needs.validate-manifests.result }}" != "success" ]; then
-            echo "Manifest validation failed"
-            exit 1
-          fi
-          if [ "${{ needs.security.result }}" != "success" ]; then
-            echo "Security scan failed"
-            exit 1
-          fi
-          echo "All CI checks passed"
+          curl -fsSLo kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+
+      - name: Deploy to cluster
+        env:
+          KUBECONFIG_DATA: ${{ secrets.KUBECONFIG }}
+        run: |
+          mkdir -p ~/.kube
+          echo "$KUBECONFIG_DATA" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+          # Deploy infrastructure first, then apps
+          kubectl apply -k infrastructure/sealed-secrets/
+          kubectl apply -k infrastructure/cert-manager/
+          kubectl apply -k infrastructure/external-dns/
+          kubectl apply -k infrastructure/minio/
+          kubectl apply -k infrastructure/authelia/
+          kubectl apply -k infrastructure/cloudflare-tunnel/
+          kubectl apply -k infrastructure/open-webui/
+          kubectl apply -k apps/outline/
