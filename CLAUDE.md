@@ -2,14 +2,14 @@
 
 ## Overview
 
-GitOps-managed K3s cluster with ArgoCD, lightweight SSO, and TLS.
+K3s cluster deployed via GitHub Actions. Push to main triggers deploy.
 
 ## Stack
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
 | Cluster | K3s | Lightweight Kubernetes |
-| GitOps | ArgoCD | Continuous deployment |
+| Deploy | GitHub Actions | Push-based deploys via Tailscale |
 | Config | Kustomize | Manifest management |
 | Ingress | Cloudflare Tunnel | External access |
 | TLS | cert-manager + Let's Encrypt | Automatic certificates |
@@ -23,8 +23,6 @@ GitOps-managed K3s cluster with ArgoCD, lightweight SSO, and TLS.
 
 ```
 apps/
-├── argocd/           # GitOps + Application CRDs
-│   └── applications/ # ArgoCD Application manifests
 └── outline/          # Documentation wiki
 
 infrastructure/
@@ -44,17 +42,28 @@ infrastructure/
 | Open WebUI | AI chat interface | SQLite |
 | Outline | Documentation wiki | PostgreSQL + Redis |
 
+## Deploy Flow
+
+1. Push to `main` branch
+2. GitHub Actions validates manifests
+3. Actions connects to cluster via Tailscale
+4. `kubectl apply -k` deploys changes
+
 ## Key Commands
 
 ```bash
-# Validate manifests
+# Validate manifests locally
 ./tests/validate-manifests.sh
 
-# Check ArgoCD status
-kubectl get applications -n argocd
-
-# Bootstrap cluster
-./scripts/bootstrap-argocd.sh
+# Manual deploy (from cluster)
+kubectl apply -k infrastructure/sealed-secrets/
+kubectl apply -k infrastructure/cert-manager/
+kubectl apply -k infrastructure/external-dns/
+kubectl apply -k infrastructure/minio/
+kubectl apply -k infrastructure/authelia/
+kubectl apply -k infrastructure/cloudflare-tunnel/
+kubectl apply -k infrastructure/open-webui/
+kubectl apply -k apps/outline/
 ```
 
 ## Secrets Management
@@ -71,13 +80,13 @@ kubectl create secret generic {name} -n {namespace} \
 ## Adding a Service
 
 1. Create `apps/{service}/` or `infrastructure/{service}/` with manifests
-2. Create ArgoCD Application in `apps/argocd/applications/`
-3. Add to `apps/argocd/applications/kustomization.yaml`
-4. Commit and push - ArgoCD syncs automatically
+2. Add to deploy step in `.github/workflows/ci.yaml`
+3. Commit and push - deploys automatically
 
-## Required Secrets
+## GitHub Secrets Required
 
-- `cloudflare-tunnel-credentials`: CF Tunnel credentials
-- `authelia-secrets`: JWT, session, storage keys
-- `outline-secrets`: Database URL, OIDC credentials
-- `open-webui-secret`: Application secret
+| Secret | Purpose |
+|--------|---------|
+| `TS_OAUTH_CLIENT_ID` | Tailscale OAuth client ID |
+| `TS_OAUTH_SECRET` | Tailscale OAuth secret |
+| `KUBECONFIG` | Base64-encoded kubeconfig |
