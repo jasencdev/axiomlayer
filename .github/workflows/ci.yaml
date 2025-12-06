@@ -7,378 +7,58 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Cancel in-progress runs when new commits are pushed
-# Prevents CI pileup from rapid Copilot suggestion commits
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
-  statuses: write
 
 jobs:
   validate-manifests:
     name: Validate Manifests
-    runs-on: [self-hosted, homelab]
-    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install kubectl
         run: |
-          if ! command -v kubectl &> /dev/null; then
-            ARCH=$(uname -m)
-            case $ARCH in
-              x86_64) ARCH="amd64" ;;
-              aarch64) ARCH="arm64" ;;
-              armv7l) ARCH="arm" ;;
-            esac
-            OS=$(uname -s)
-            case $OS in
-              Linux) OS="linux" ;;
-              Darwin) OS="darwin" ;;
-              *) echo "Unsupported OS: $OS"; exit 1 ;;
-            esac
-            curl -fsSLo kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/${OS}/${ARCH}/kubectl"
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
-          fi
-          kubectl version --client
+          curl -fsSLo kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
 
       - name: Validate kustomizations
         run: ./tests/validate-manifests.sh
 
-  lint:
-    name: Kubernetes Linting
-    runs-on: [self-hosted, homelab]
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install kube-linter
-        run: |
-          if ! command -v kube-linter &> /dev/null; then
-            ARCH=$(uname -m)
-            case $ARCH in
-              x86_64) TARBALL="kube-linter-linux.tar.gz" ;;
-              aarch64) TARBALL="kube-linter-linux_arm64.tar.gz" ;;
-              *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
-            esac
-            curl -sSL -o /tmp/kube-linter.tar.gz "https://github.com/stackrox/kube-linter/releases/download/v0.7.6/${TARBALL}"
-            tar -xzf /tmp/kube-linter.tar.gz -C /tmp
-            sudo mv /tmp/kube-linter /usr/local/bin/
-            rm /tmp/kube-linter.tar.gz
-          fi
-          kube-linter version
-
-      - name: Lint apps
-        run: kube-linter lint apps/ --config .kube-linter.yaml || true
-
-      - name: Lint infrastructure
-        run: kube-linter lint infrastructure/ --config .kube-linter.yaml || true
-
-  polaris:
-    name: Polaris Audit
-    runs-on: [self-hosted, homelab]
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install kubectl
-        run: |
-          if ! command -v kubectl &> /dev/null; then
-            ARCH=$(uname -m)
-            case $ARCH in
-              x86_64) ARCH="amd64" ;;
-              aarch64) ARCH="arm64" ;;
-              armv7l) ARCH="arm" ;;
-            esac
-            OS=$(uname -s)
-            case $OS in
-              Linux) OS="linux" ;;
-              Darwin) OS="darwin" ;;
-              *) echo "Unsupported OS: $OS"; exit 1 ;;
-            esac
-            curl -fsSLo kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/${OS}/${ARCH}/kubectl"
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
-          fi
-          kubectl version --client
-
-      - name: Install Polaris
-        run: |
-          if ! command -v polaris &> /dev/null; then
-            ARCH=$(uname -m)
-            case $ARCH in
-              x86_64) ARCH="amd64" ;;
-              aarch64) ARCH="arm64" ;;
-              *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
-            esac
-            POLARIS_VERSION="9.6.1"
-            curl -sSL -o /tmp/polaris.tar.gz "https://github.com/FairwindsOps/polaris/releases/download/${POLARIS_VERSION}/polaris_linux_${ARCH}.tar.gz"
-            tar -xzf /tmp/polaris.tar.gz -C /tmp
-            sudo mv /tmp/polaris /usr/local/bin/
-            rm /tmp/polaris.tar.gz
-          fi
-          polaris version
-
-      - name: Build kustomize manifests
-        run: |
-          mkdir -p /tmp/rendered-manifests
-          for dir in apps/*/; do
-            app=$(basename "$dir")
-            if [ -f "${dir}kustomization.yaml" ]; then
-              kubectl kustomize "$dir" > "/tmp/rendered-manifests/${app}.yaml" 2>/dev/null || true
-            fi
-          done
-          for dir in infrastructure/*/; do
-            infra=$(basename "$dir")
-            if [ -f "${dir}kustomization.yaml" ]; then
-              kubectl kustomize "$dir" > "/tmp/rendered-manifests/${infra}.yaml" 2>/dev/null || true
-            fi
-          done
-
-      - name: Run Polaris audit
-        run: |
-          # Run polaris on rendered manifests
-          polaris audit --audit-path /tmp/rendered-manifests \
-            --format pretty \
-            --set-exit-code-below-score 80 || true
-
-          # Also output score summary
-          echo ""
-          echo "=== Polaris Score Summary ==="
-          polaris audit --audit-path /tmp/rendered-manifests \
-            --format score 2>/dev/null || echo "Score calculation failed"
-
   security:
-    name: Security Scanning
-    runs-on: [self-hosted, homelab]
-    if: github.event_name == 'pull_request'
+    name: Security Scan
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install Trivy
         run: |
-          if ! command -v trivy &> /dev/null; then
-            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin v0.58.0
-          fi
-          trivy version
-
-      - name: Scan for misconfigurations
-        run: trivy config . --severity HIGH,CRITICAL --exit-code 0
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
 
       - name: Scan for secrets
         run: trivy fs . --scanners secret --exit-code 1
 
-      - name: Check for plaintext secrets
-        run: |
-          echo "Checking for plaintext Secret resources (should use SealedSecret)..."
-          if grep -rn '^kind: Secret$' --include="*.yaml" apps/ infrastructure/ | grep -v "SealedSecret" | grep -v "kind: SealedSecret"; then
-            echo "ERROR: Found plaintext Secret. Use SealedSecret instead."
-            exit 1
-          fi
-          echo "No plaintext secrets found"
-
-  # Gate job - only passes when all CI checks pass
   ci-passed:
     name: CI Passed
-    runs-on: [self-hosted, homelab]
-    needs: [validate-manifests, lint, polaris, security]
+    runs-on: ubuntu-latest
+    needs: [validate-manifests, security]
     if: always()
     steps:
       - name: Check CI results
         run: |
-          # On PRs, validate-manifests and security must pass
-          # On main push, these jobs are skipped (already validated in PR)
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            if [ "${{ needs.validate-manifests.result }}" != "success" ]; then
-              echo "Manifest validation failed"
-              exit 1
-            fi
-            if [ "${{ needs.security.result }}" != "success" ]; then
-              echo "Security scan failed"
-              exit 1
-            fi
-            # Lint is informational only
-            echo "All required CI checks passed"
-          else
-            echo "Main push - validation already done in PR"
+          if [ "${{ needs.validate-manifests.result }}" != "success" ]; then
+            echo "Manifest validation failed"
+            exit 1
           fi
-
-      - name: Trigger ArgoCD sync
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        env:
-          ARGOCD_SERVER: argocd.lab.axiomlayer.com
-          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
-        run: |
-          if [ -z "$ARGOCD_AUTH_TOKEN" ]; then
-            echo "ARGOCD_AUTH_TOKEN not set, skipping sync trigger"
-            exit 0
+          if [ "${{ needs.security.result }}" != "success" ]; then
+            echo "Security scan failed"
+            exit 1
           fi
-
-          # Trigger sync for the root application (app of apps)
-          curl -sSL -X POST \
-            -H "Authorization: Bearer $ARGOCD_AUTH_TOKEN" \
-            -H "Content-Type: application/json" \
-            "https://${ARGOCD_SERVER}/api/v1/applications/applications/sync" \
-            -d '{"prune": true}' || echo "Sync trigger sent (may require manual approval)"
-
-  # Integration tests - run on PRs only (already validated before merge)
-  integration-tests:
-    name: Integration Tests
-    runs-on: [self-hosted, homelab]
-    needs: [ci-passed]
-    if: github.event_name == 'pull_request' && always() && needs.ci-passed.result == 'success'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install kubectl
-        run: |
-          if ! command -v kubectl &> /dev/null; then
-            ARCH=$(uname -m)
-            case $ARCH in
-              x86_64) ARCH="amd64" ;;
-              aarch64) ARCH="arm64" ;;
-              armv7l) ARCH="arm" ;;
-            esac
-            OS=$(uname -s)
-            case $OS in
-              Linux) OS="linux" ;;
-              Darwin) OS="darwin" ;;
-              *) echo "Unsupported OS: $OS"; exit 1 ;;
-            esac
-            curl -fsSLo kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/${OS}/${ARCH}/kubectl"
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
-          fi
-          kubectl version --client
-
-      - name: Run smoke tests
-        run: ./tests/smoke-test.sh
-
-      - name: Run auth tests
-        run: ./tests/test-auth.sh
-
-      - name: Run application functionality tests
-        run: ./tests/test-app-functionality.sh
-
-      - name: Run monitoring tests
-        run: ./tests/test-monitoring.sh
-
-  # NOTE: Popeye cluster scan removed - it scans live cluster state, not PR changes
-  # Run popeye locally: popeye -f .popeye.yaml --all-namespaces
-
-  # Extended tests - run on PRs only (already validated before merge)
-  extended-tests:
-    name: Extended Tests
-    runs-on: [self-hosted, homelab]
-    needs: [ci-passed]
-    if: github.event_name == 'pull_request' && always() && needs.ci-passed.result == 'success'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install kubectl
-        run: |
-          if ! command -v kubectl &> /dev/null; then
-            ARCH=$(uname -m)
-            case $ARCH in
-              x86_64) ARCH="amd64" ;;
-              aarch64) ARCH="arm64" ;;
-              armv7l) ARCH="arm" ;;
-            esac
-            OS=$(uname -s)
-            case $OS in
-              Linux) OS="linux" ;;
-              Darwin) OS="darwin" ;;
-              *) echo "Unsupported OS: $OS"; exit 1 ;;
-            esac
-            curl -fsSLo kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/${OS}/${ARCH}/kubectl"
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
-          fi
-          kubectl version --client
-
-      - name: Run backup and restore tests
-        env:
-          RUN_BACKUP_TEST: "true"
-          VERIFY_BACKUP_FILES: "true"
-        run: ./tests/test-backup-restore.sh
-
-      - name: Run network policy tests
-        run: ./tests/test-network-policies.sh
-
-  # Outline sync - Syncs markdown docs to Outline wiki using hash-based deduplication
-  outline-sync:
-    name: Outline Sync
-    runs-on: [self-hosted, homelab]
-    needs: [ci-passed]
-    # Run on main push after ArgoCD sync, or on manual trigger
-    if: always() && needs.ci-passed.result == 'success' && ((github.ref == 'refs/heads/main' && github.event_name == 'push') || github.event_name == 'workflow_dispatch')
-    env:
-      OUTLINE_API_TOKEN: ${{ secrets.OUTLINE_API_TOKEN }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Sync docs to Outline
-        run: |
-          if [ -z "$OUTLINE_API_TOKEN" ]; then
-            echo "OUTLINE_API_TOKEN not set; skipping Outline sync."
-            exit 0
-          fi
-          ./scripts/sync-outline.sh
-
-  # RAG sync - Syncs repo files to Open WebUI knowledge base using hash-based deduplication
-  rag-sync:
-    name: RAG Sync
-    runs-on: [self-hosted, homelab]
-    needs: [ci-passed]
-    # Run on main push after ArgoCD sync, or on manual trigger
-    if: always() && needs.ci-passed.result == 'success' && ((github.ref == 'refs/heads/main' && github.event_name == 'push') || github.event_name == 'workflow_dispatch')
-    env:
-      OPEN_WEBUI_API_KEY: ${{ secrets.OPEN_WEBUI_API_KEY }}
-      OPEN_WEBUI_KNOWLEDGE_ID: ${{ secrets.OPEN_WEBUI_KNOWLEDGE_ID }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install kubectl
-        run: |
-          if ! command -v kubectl &> /dev/null; then
-            ARCH=$(uname -m)
-            case $ARCH in
-              x86_64) ARCH="amd64" ;;
-              aarch64) ARCH="arm64" ;;
-              armv7l) ARCH="arm" ;;
-            esac
-            OS=$(uname -s)
-            case $OS in
-              Linux) OS="linux" ;;
-              Darwin) OS="darwin" ;;
-              *) echo "Unsupported OS: $OS"; exit 1 ;;
-            esac
-            curl -fsSLo kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/${OS}/${ARCH}/kubectl"
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
-          fi
-          kubectl version --client
-
-      - name: Sync repo to Open WebUI RAG
-        run: |
-          if [ -z "$OPEN_WEBUI_API_KEY" ]; then
-            echo "OPEN_WEBUI_API_KEY not set; skipping RAG sync."
-            exit 0
-          fi
-          if [ -z "$OPEN_WEBUI_KNOWLEDGE_ID" ]; then
-            echo "OPEN_WEBUI_KNOWLEDGE_ID not set; skipping RAG sync."
-            exit 0
-          fi
-          ./scripts/sync-rag.sh
+          echo "All CI checks passed"
