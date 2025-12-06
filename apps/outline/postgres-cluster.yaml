@@ -11,6 +11,9 @@ metadata:
 spec:
   instances: 2
 
+  affinity:
+    podAntiAffinityType: required
+
   resources:
     requests:
       cpu: 100m
