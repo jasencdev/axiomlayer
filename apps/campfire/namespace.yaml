@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: campfire
-  labels:
-    app.kubernetes.io/name: campfire
-    app.kubernetes.io/component: chat
-    app.kubernetes.io/part-of: homelab
-    app.kubernetes.io/managed-by: argocd

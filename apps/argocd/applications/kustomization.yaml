@@ -1,28 +1,13 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - actions-runner-controller.yaml
-  - actions-runner-infra.yaml
-  - alertmanager.yaml
   - argocd-helm.yaml
-  - backups.yaml
-  - authentik.yaml
-  - authentik-helm.yaml
-  - campfire.yaml
+  - authelia.yaml
   - cert-manager.yaml
   - cert-manager-helm.yaml
-  - cloudnative-pg.yaml
-  - dashboard.yaml
+  - cloudflare-tunnel.yaml
   - external-dns.yaml
-  - kube-prometheus-stack.yaml
-  - monitoring-extras.yaml
-  - loki.yaml
   - minio.yaml
-  - n8n.yaml
   - open-webui.yaml
   - outline.yaml
-  - plane.yaml
-  - plane-extras.yaml
-  - pocketbase.yaml
   - sealed-secrets.yaml
-  - telnet-server.yaml

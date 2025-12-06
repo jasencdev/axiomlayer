@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/part-of: homelab
     app.kubernetes.io/managed-by: argocd
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: outline
@@ -102,13 +102,13 @@ spec:
               name: outline-secrets
               key: oidc-client-secret
         - name: OIDC_AUTH_URI
-          value: "https://auth.lab.axiomlayer.com/application/o/authorize/"
+          value: "https://auth.lab.axiomlayer.com/api/oidc/authorization"
         - name: OIDC_TOKEN_URI
-          value: "http://authentik-helm-server.authentik.svc.cluster.local/application/o/token/"
+          value: "http://authelia.authelia.svc:9091/api/oidc/token"
         - name: OIDC_USERINFO_URI
-          value: "http://authentik-helm-server.authentik.svc.cluster.local/application/o/userinfo/"
+          value: "http://authelia.authelia.svc:9091/api/oidc/userinfo"
         - name: OIDC_DISPLAY_NAME
-          value: "Authentik"
+          value: "Authelia"
         - name: OIDC_USERNAME_CLAIM
           value: "preferred_username"
         volumeMounts:
