@@ -272,62 +272,8 @@ jobs:
       - name: Run monitoring tests
         run: ./tests/test-monitoring.sh
 
-  # Popeye cluster scan - run on PRs only (already validated before merge)
-  popeye-scan:
-    name: Popeye Cluster Scan
-    runs-on: [self-hosted, homelab]
-    needs: [ci-passed]
-    if: github.event_name == 'pull_request' && always() && needs.ci-passed.result == 'success'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install popeye
-        run: |
-          if ! command -v popeye &> /dev/null; then
-            ARCH=$(uname -m)
-            case $ARCH in
-              x86_64) ARCH="amd64" ;;
-              aarch64) ARCH="arm64" ;;
-              *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
-            esac
-            POPEYE_VERSION="0.21.3"
-            curl -sSL -o /tmp/popeye.tar.gz "https://github.com/derailed/popeye/releases/download/v${POPEYE_VERSION}/popeye_Linux_${ARCH}.tar.gz"
-            tar -xzf /tmp/popeye.tar.gz -C /tmp
-            sudo mv /tmp/popeye /usr/local/bin/
-            rm /tmp/popeye.tar.gz
-          fi
-          popeye version
-
-      - name: Run Popeye scan
-        run: |
-          # Run popeye with spinfile and capture score
-          SPINFILE_ARG=""
-          if [ -f ".popeye.yaml" ]; then
-            SPINFILE_ARG="-f .popeye.yaml"
-          fi
-          popeye --all-namespaces --force-exit-zero $SPINFILE_ARG -o json > /tmp/popeye-report.json 2>/dev/null || true
-
-          # Extract and display score (popeye JSON structure: .popeye.score)
-          SCORE=$(jq -r '.popeye.score // 0' /tmp/popeye-report.json 2>/dev/null || echo "0")
-          echo "Cluster health score: ${SCORE}%"
-
-          # Show summary of issues
-          echo ""
-          echo "=== Issue Summary ==="
-          jq -r '.popeye.sanitizers[] | select(.issues != null) | "\(.sanitizer): \(.issues | length) issues"' /tmp/popeye-report.json 2>/dev/null || true
-
-          # Fail if score drops below threshold
-          THRESHOLD=80
-          if [ "${SCORE}" -lt "${THRESHOLD}" ]; then
-            echo ""
-            echo "ERROR: Cluster health score ${SCORE}% is below threshold of ${THRESHOLD}%"
-            echo "Run 'popeye --all-namespaces' locally for full report"
-            exit 1
-          fi
-
-          echo ""
-          echo "Cluster health score ${SCORE}% meets threshold of ${THRESHOLD}%"
+  # NOTE: Popeye cluster scan removed - it scans live cluster state, not PR changes
+  # Run popeye locally: popeye -f .popeye.yaml --all-namespaces
 
   # Extended tests - run on PRs only (already validated before merge)
   extended-tests:
