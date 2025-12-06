@@ -20,6 +20,12 @@ spec:
         app.kubernetes.io/component: server
         app.kubernetes.io/part-of: homelab
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: neko2
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
