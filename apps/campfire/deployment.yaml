@@ -24,6 +24,11 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/arch: amd64
+        kubernetes.io/hostname: neko
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
       imagePullSecrets:
         - name: ghcr-pull-secret
       securityContext:
